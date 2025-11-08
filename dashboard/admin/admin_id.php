@@ -49,12 +49,12 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
         $_SESSION['success'] = "ID marked as completed/issued!";
         
     } elseif ($_GET['action'] === 'generate_id') {
-        // Generate and issue ID (you can add PDF generation here later)
+        // Generate and issue ID
         $request_id = intval($_GET['id']);
         
         // Get request details
         $request_stmt = $conn->prepare("
-            SELECT ir.*, s.first_name, s.last_name, s.student_id, s.email, s.course, s.year_level, s.photo 
+            SELECT ir.*, s.first_name, s.last_name, s.student_id, s.email, s.course, s.year_level, s.photo, s.emergency_contact, s.blood_type, s.address
             FROM id_requests ir 
             JOIN student s ON ir.student_id = s.id 
             WHERE ir.id = ?
@@ -75,13 +75,29 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
             // Log activity
             $conn->query("INSERT INTO activity_logs (admin_id, action, target_user) VALUES ($admin_id, 'Generated ID for student: {$request_data['email']}', 0)");
             $_SESSION['success'] = "ID generated successfully for {$request_data['first_name']} {$request_data['last_name']}!";
-            
-            // Here you can add PDF generation logic
-            // generateStudentIDCard($request_data);
         }
     }
     
     header("Location: admin_id.php");
+    exit();
+}
+
+// Handle ID viewing/downloading
+if (isset($_GET['view_id'])) {
+    $student_id = $_GET['view_id'];
+    header("Location: generate_id_card.php?student_id=" . $student_id . "&mode=preview");
+    exit();
+}
+
+if (isset($_GET['download_id'])) {
+    $student_id = $_GET['download_id'];
+    header("Location: generate_id_card.php?student_id=" . $student_id . "&mode=download");
+    exit();
+}
+
+if (isset($_GET['print_id'])) {
+    $student_id = $_GET['print_id'];
+    header("Location: generate_id_card.php?student_id=" . $student_id . "&mode=print");
     exit();
 }
 
@@ -134,7 +150,7 @@ $request_type_filter = $_GET['request_type'] ?? '';
 
 // Build query with filters
 $query = "
-    SELECT ir.*, s.first_name, s.last_name, s.student_id, s.email, s.course, s.year_level, s.photo, s.contact_number,
+    SELECT ir.*, s.first_name, s.last_name, s.student_id, s.email, s.course, s.year_level, s.photo, s.contact_number, s.emergency_contact, s.blood_type,
            u.user_id as user_exists
     FROM id_requests ir 
     JOIN student s ON ir.student_id = s.id 
@@ -223,6 +239,21 @@ $stats = $conn->query("
         padding: 10px;
         margin-bottom: 15px;
     }
+    .id-preview {
+        max-width: 300px;
+        border: 2px solid #dee2e6;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .quick-actions {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+    }
+    .quick-actions .btn {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
   </style>
 </head>
 <body class="bg-light">
@@ -278,6 +309,41 @@ $stats = $conn->query("
       </div>
     </div>
 
+    <!-- Quick Action Buttons -->
+    <div class="card shadow mb-4">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">⚡ Quick Actions</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="d-grid">
+              <a href="generate_id_bulk.php" class="btn btn-success">
+                📦 Generate IDs in Bulk
+              </a>
+              <small class="text-muted mt-1">Generate multiple IDs at once</small>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="d-grid">
+              <a href="id_templates.php" class="btn btn-info">
+                🎨 Manage ID Templates
+              </a>
+              <small class="text-muted mt-1">Customize ID card designs</small>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="d-grid">
+              <a href="id_reports.php" class="btn btn-warning">
+                📊 ID Issuance Reports
+              </a>
+              <small class="text-muted mt-1">View printing statistics</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Filters -->
     <div class="card shadow mb-4">
       <div class="card-header bg-primary text-white">
@@ -326,6 +392,7 @@ $stats = $conn->query("
           <option value="approve">Approve Selected</option>
           <option value="reject">Reject Selected</option>
           <option value="complete">Mark as Completed</option>
+          <option value="generate">Generate IDs</option>
         </select>
         <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Are you sure you want to perform this bulk action?')">
           Apply
@@ -416,11 +483,40 @@ $stats = $conn->query("
                             <a href="?action=generate_id&id=<?= $request['id'] ?>" class="btn btn-primary">Generate ID</a>
                             <a href="?action=complete&id=<?= $request['id'] ?>" class="btn btn-success">Mark Complete</a>
                           <?php elseif ($request['status'] === 'completed'): ?>
-                            <a href="#" class="btn btn-info">View ID</a>
-                            <a href="#" class="btn btn-secondary">Re-download</a>
+                            <div class="quick-actions w-100">
+                              <a href="?view_id=<?= $request['student_id'] ?>" class="btn btn-info" target="_blank">👁️ View</a>
+                              <a href="?download_id=<?= $request['student_id'] ?>" class="btn btn-success">📥 Download</a>
+                              <a href="?print_id=<?= $request['student_id'] ?>" class="btn btn-warning">🖨️ Print</a>
+                              <a href="generate_id_card.php?student_id=<?= $request['student_id'] ?>&mode=email" class="btn btn-secondary">📧 Email</a>
+                            </div>
                           <?php endif; ?>
-                          <a href="student_details.php?id=<?= $request['student_id'] ?>" class="btn btn-outline-dark">View Student</a>
+                          <a href="student_details.php?id=<?= $request['student_id'] ?>" class="btn btn-outline-dark mt-1">View Student</a>
                         </div>
+                        
+                        <!-- ID Preview for Completed Requests -->
+                        <?php if ($request['status'] === 'completed'): ?>
+                          <div class="mt-2 p-2 border rounded">
+                            <small class="text-muted d-block mb-1">ID Preview:</small>
+                            <div class="id-preview mx-auto">
+                              <div class="bg-primary text-white p-2 text-center">
+                                <strong>SCHOOL ID</strong>
+                              </div>
+                              <div class="p-2">
+                                <div class="row">
+                                  <div class="col-4">
+                                    <img src="<?= $request['photo'] ? '../../uploads/' . htmlspecialchars($request['photo']) : '../../assets/img/default_user.png' ?>" 
+                                         class="w-100 rounded">
+                                  </div>
+                                  <div class="col-8">
+                                    <small><strong><?= htmlspecialchars($request['first_name'] . ' ' . $request['last_name']) ?></strong></small><br>
+                                    <small>ID: <?= $request['student_id'] ?></small><br>
+                                    <small><?= $request['course'] ?? 'N/A' ?></small>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        <?php endif; ?>
                       </div>
                     </div>
                   </div>
