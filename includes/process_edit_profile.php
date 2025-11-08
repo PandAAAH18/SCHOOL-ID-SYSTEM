@@ -13,10 +13,13 @@ $email = $_SESSION['email'];
 // Get form values
 $first_name = mysqli_real_escape_string($conn, $_POST['first_name']);
 $last_name = mysqli_real_escape_string($conn, $_POST['last_name']);
+$student_id = mysqli_real_escape_string($conn, $_POST['student_id']);
 $year_level = mysqli_real_escape_string($conn, $_POST['year_level']);
 $course = mysqli_real_escape_string($conn, $_POST['course']);
 $contact_number = mysqli_real_escape_string($conn, $_POST['contact_number']);
+$emergency_contact = mysqli_real_escape_string($conn, $_POST['emergency_contact']);
 $address = mysqli_real_escape_string($conn, $_POST['address']);
+$blood_type = mysqli_real_escape_string($conn, $_POST['blood_type']);
 
 // Handle photo upload (optional)
 $photo_path = null;
@@ -26,7 +29,14 @@ if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
     
     if (!in_array($photo['type'], $allowed_types)) {
         $_SESSION['error'] = "Invalid image format. Allowed: jpg, jpeg, png, gif.";
-        header("Location: ../dashboard/edit_profile.php");
+        header("Location: ../dashboard/student/edit_student_profile.php");
+        exit();
+    }
+
+    // Check file size (max 2MB)
+    if ($photo['size'] > 2097152) {
+        $_SESSION['error'] = "File too large. Maximum size is 2MB.";
+        header("Location: ../dashboard/student/edit_student_profile.php");
         exit();
     }
 
@@ -46,7 +56,7 @@ if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
     
     if (!move_uploaded_file($photo['tmp_name'], $upload_dir . $new_name)) {
         $_SESSION['error'] = "Error uploading photo.";
-        header("Location: ../dashboard/edit_profile.php");
+        header("Location: ../dashboard/student/edit_student_profile.php");
         exit();
     }
 
@@ -56,12 +66,12 @@ if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
 // Build update query
 if ($photo_path) {
     // Update with new photo
-    $stmt = $conn->prepare("UPDATE student SET first_name=?, last_name=?, year_level=?, course=?, contact_number=?, address=?, photo=? WHERE email=?");
-    $stmt->bind_param("ssssssss", $first_name, $last_name, $year_level, $course, $contact_number, $address, $photo_path, $email);
+    $stmt = $conn->prepare("UPDATE student SET first_name=?, last_name=?, student_id=?, year_level=?, course=?, contact_number=?, emergency_contact=?, address=?, blood_type=?, photo=? WHERE email=?");
+    $stmt->bind_param("sssssssssss", $first_name, $last_name, $student_id, $year_level, $course, $contact_number, $emergency_contact, $address, $blood_type, $photo_path, $email);
 } else {
     // Update without changing photo
-    $stmt = $conn->prepare("UPDATE student SET first_name=?, last_name=?, year_level=?, course=?, contact_number=?, address=? WHERE email=?");
-    $stmt->bind_param("sssssss", $first_name, $last_name, $year_level, $course, $contact_number, $address, $email);
+    $stmt = $conn->prepare("UPDATE student SET first_name=?, last_name=?, student_id=?, year_level=?, course=?, contact_number=?, emergency_contact=?, address=?, blood_type=? WHERE email=?");
+    $stmt->bind_param("ssssssssss", $first_name, $last_name, $student_id, $year_level, $course, $contact_number, $emergency_contact, $address, $blood_type, $email);
 }
 
 // Execute
@@ -73,15 +83,23 @@ if ($stmt->execute()) {
     $update_users->execute();
     $update_users->close();
 
-    // Update session variable
+    // Update session variables
     $_SESSION['full_name'] = $full_name;
+    $_SESSION['student_first_name'] = $first_name;
+    $_SESSION['student_last_name'] = $last_name;
+    if ($photo_path) {
+        $_SESSION['student_photo'] = $photo_path;
+    }
 
     $_SESSION['success'] = "Profile updated successfully!";
-    header("Location: ../dashboard/student_dashboard.php");
+    header("Location: ../dashboard/student/student_dashboard.php");
     exit();
 } else {
     $_SESSION['error'] = "Error updating profile: " . $conn->error;
-    header("Location: ../dashboard/edit_profile.php");
+    header("Location: ../dashboard/student/edit_student_profile.php");
     exit();
 }
+
+$stmt->close();
+$conn->close();
 ?>

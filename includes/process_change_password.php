@@ -74,11 +74,11 @@ if ($stmt->execute()) {
     }
 
     $_SESSION['success'] = "Password changed successfully!";
-    header("Location: ../dashboard/{$role}.php");
+    header("Location: ../dashboard/{$role}/{$role}_dashboard.php");
     exit();
 } else {
     $_SESSION['error'] = "Error updating password: " . $conn->error;
-    header("Location: ../dashboard/change_password.php");
+    header("Location: ../dashboard/student/change_password.php");
     exit();
 }
 

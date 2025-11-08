@@ -103,7 +103,7 @@ $full_name = trim($student['first_name'] . ' ' . $student['last_name']);
       </div>
     </div>
   </div>
-
+<?php include '../../includes/footer.php'; ?>
   <script src="../../assets/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

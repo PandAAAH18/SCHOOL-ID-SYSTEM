@@ -8,55 +8,37 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
   exit();
 }
 
-// Handle actions: Approve, Verify, Delete
-if (isset($_GET['action']) && isset($_GET['id'])) {
-  $user_id = intval($_GET['id']);
-  $action = $_GET['action'];
-  $admin_id = $_SESSION['user_id'];
+// Get statistics for dashboard
+$stats = $conn->query("
+    SELECT 
+        (SELECT COUNT(*) FROM users) as total_users,
+        (SELECT COUNT(*) FROM users WHERE role = 'student') as total_students,
+        (SELECT COUNT(*) FROM users WHERE role = 'admin') as total_admins,
+        (SELECT COUNT(*) FROM users WHERE status = 'pending') as pending_users,
+        (SELECT COUNT(*) FROM student s LEFT JOIN users u ON s.email = u.email WHERE u.email IS NULL) as pending_students,
+        (SELECT COUNT(*) FROM id_requests WHERE status = 'pending') as pending_id_requests,
+        (SELECT COUNT(*) FROM id_requests WHERE status = 'completed') as completed_id_requests,
+        (SELECT COUNT(*) FROM student WHERE student_id IS NOT NULL) as students_with_ids
+")->fetch_assoc();
 
-  if ($action === 'approve') {
-    $stmt = $conn->prepare("UPDATE users SET status='approved' WHERE user_id=?");
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    $stmt->close();
+// Get recent activity
+$recent_activity = $conn->query("
+    SELECT al.*, u.email 
+    FROM activity_logs al 
+    LEFT JOIN users u ON al.target_user = u.user_id 
+    ORDER BY al.created_at DESC 
+    LIMIT 5
+");
 
-    $conn->query("INSERT INTO activity_logs (admin_id, action, target_user) VALUES ($admin_id, 'Approved user ID', $user_id)");
-  } 
-  elseif ($action === 'verify') {
-    // ✅ FIXED: Changed 'verified' to 'is_verified'
-    $stmt = $conn->prepare("UPDATE users SET is_verified=1 WHERE user_id=?");
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    $stmt->close();
-
-    $conn->query("INSERT INTO activity_logs (admin_id, action, target_user) VALUES ($admin_id, 'Verified user email', $user_id)");
-  } 
-  elseif ($action === 'delete') {
-    $stmt = $conn->prepare("DELETE FROM users WHERE user_id=?");
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    $stmt->close();
-
-    $conn->query("INSERT INTO activity_logs (admin_id, action, target_user) VALUES ($admin_id, 'Deleted user account', $user_id)");
-  }
-
-  elseif ($action === 'unapprove') {
-    $stmt = $conn->prepare("UPDATE users SET status='pending' WHERE user_id=?");
-    $stmt->bind_param("i", $user_id); $stmt->execute(); $stmt->close();
-    $conn->query("INSERT INTO activity_logs (admin_id, action, target_user) VALUES ($admin_id, 'Unapproved user ID', $user_id)");
-}
-elseif ($action === 'unverify') {
-    $stmt = $conn->prepare("UPDATE users SET is_verified=0 WHERE user_id=?");
-    $stmt->bind_param("i", $user_id); $stmt->execute(); $stmt->close();
-    $conn->query("INSERT INTO activity_logs (admin_id, action, target_user) VALUES ($admin_id, 'Unverified user email', $user_id)");
-}
-
-  header("Location: admin.php");
-  exit();
-}
-
-// Fetch all users
-$users = $conn->query("SELECT * FROM users ORDER BY user_id ASC");
+// Get pending ID requests
+$pending_requests = $conn->query("
+    SELECT ir.*, s.first_name, s.last_name, s.student_id, s.email 
+    FROM id_requests ir 
+    JOIN student s ON ir.student_id = s.id 
+    WHERE ir.status = 'pending' 
+    ORDER BY ir.created_at DESC 
+    LIMIT 5
+");
 ?>
 
 <!DOCTYPE html>
@@ -65,97 +47,206 @@ $users = $conn->query("SELECT * FROM users ORDER BY user_id ASC");
   <meta charset="UTF-8">
   <title>Admin Dashboard | School ID System</title>
   <link rel="stylesheet" href="../../assets/css/bootstrap.min.css">
+  <style>
+    .stats-card {
+        transition: transform 0.2s;
+        height: 100%;
+    }
+    .stats-card:hover {
+        transform: translateY(-2px);
+    }
+    .quick-action-card {
+        border-left: 4px solid #0d6efd;
+    }
+  </style>
 </head>
 <body class="bg-light">
-  <div class="container mt-5">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+  <?php include '../../includes/header_admin.php'; ?>
+  
+  <div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
       <h2>Admin Dashboard</h2>
-      <a href="../../logout.php" class="btn btn-secondary btn-sm">Logout</a>
+      <div class="text-muted">Welcome back, <?= htmlspecialchars($_SESSION['full_name'] ?? 'Admin') ?></div>
     </div>
-    
-    <div class="card shadow">
-      <div class="card-header bg-success text-white">User Management</div>
-      <div class="card-body">
-        <table class="table table-bordered table-striped">
-          <thead>
-            <tr>
-              <th>User ID</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Verified</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <div class="mb-2">
-  <input type="text" id="searchBox" class="form-control form-control-sm w-25"
-         placeholder="Search e-mail…">
-</div>
 
-<tbody id="userTable">
-<?php while ($row = $users->fetch_assoc()): ?>
-  <tr data-email="<?= strtolower($row['email']) ?>">
-    <td><?= $row['user_id'] ?></td>
-    <td><?= htmlspecialchars($row['email']) ?></td>
-    <td><?= $row['role'] ?></td>
-    <td><?= $row['is_verified'] ? '✅' : '❌' ?></td>
-    <td><?= $row['status'] ?></td>
-    <td class="text-nowrap">
+    <!-- Success/Error Messages -->
+    <?php if(isset($_SESSION['success'])): ?>
+      <div class="alert alert-success alert-dismissible fade show">
+        <?= $_SESSION['success']; unset($_SESSION['success']); ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <?php endif; ?>
 
-      <?php if ($row['status'] === 'approved'): ?>
-        <a href="?action=unapprove&id=<?= $row['user_id'] ?>" class="btn btn-warning btn-sm">Unapprove</a>
-      <?php else: ?>
-        <a href="?action=approve&id=<?= $row['user_id'] ?>" class="btn btn-success btn-sm">Approve</a>
-      <?php endif; ?>
+    <?php if(isset($_SESSION['error'])): ?>
+      <div class="alert alert-danger alert-dismissible fade show">
+        <?= $_SESSION['error']; unset($_SESSION['error']); ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <?php endif; ?>
 
-      <?php if ($row['is_verified']): ?>
-        <a href="?action=unverify&id=<?= $row['user_id'] ?>" class="btn btn-outline-info btn-sm">Unverify</a>
-      <?php else: ?>
-        <a href="?action=verify&id=<?= $row['user_id'] ?>" class="btn btn-info btn-sm">Verify</a>
-      <?php endif; ?>
-
-      <a href="?action=delete&id=<?= $row['user_id'] ?>"
-         class="btn btn-danger btn-sm"
-         onclick="return confirm('Are you sure?');">Delete</a>
-    </td>
-  </tr>
-<?php endwhile; ?>
-</tbody>
-
-<script>
-/* ➋ 3-line live filter */
-document.getElementById('searchBox').addEventListener('input', e => {
-  const q = e.target.value.toLowerCase();
-  document.querySelectorAll('#userTable tr').forEach(tr =>
-    tr.style.display = tr.dataset.email.includes(q) ? '' : 'none'
-  );
-});
-</script>
-        </table>
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+      <div class="col-md-3 mb-3">
+        <div class="card stats-card text-white bg-primary">
+          <div class="card-body text-center">
+            <h2><?= $stats['total_users'] ?></h2>
+            <p class="mb-0">Total Users</p>
+            <small><?= $stats['total_students'] ?> students, <?= $stats['total_admins'] ?> admins</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="card stats-card text-white bg-success">
+          <div class="card-body text-center">
+            <h2><?= $stats['students_with_ids'] ?></h2>
+            <p class="mb-0">Students with IDs</p>
+            <small><?= $stats['completed_id_requests'] ?> IDs issued</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="card stats-card text-white bg-warning">
+          <div class="card-body text-center">
+            <h2><?= $stats['pending_users'] + $stats['pending_students'] ?></h2>
+            <p class="mb-0">Pending Actions</p>
+            <small><?= $stats['pending_users'] ?> users, <?= $stats['pending_students'] ?> students</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="card stats-card text-white bg-info">
+          <div class="card-body text-center">
+            <h2><?= $stats['pending_id_requests'] ?></h2>
+            <p class="mb-0">ID Requests</p>
+            <small>Awaiting processing</small>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="card mt-4 shadow">
-      <div class="card-header bg-dark text-white">Recent Activity Logs</div>
-      <div class="card-body">
-        <?php
-        $logs = $conn->query("SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 10");
-        if ($logs->num_rows > 0):
-        ?>
-          <ul class="list-group">
-            <?php while ($log = $logs->fetch_assoc()): ?>
-              <li class="list-group-item">
-                [<?= $log['created_at'] ?>] Admin #<?= $log['admin_id'] ?> — <?= htmlspecialchars($log['action']) ?> (User #<?= $log['target_user'] ?>)
-              </li>
-            <?php endwhile; ?>
-          </ul>
-        <?php else: ?>
-          <p>No activity logs yet.</p>
-        <?php endif; ?>
+    <div class="row">
+      <!-- Quick Actions -->
+      <div class="col-md-6 mb-4">
+        <div class="card shadow">
+          <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">🚀 Quick Actions</h5>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="card quick-action-card">
+                  <div class="card-body">
+                    <h6>User Management</h6>
+                    <p class="text-muted small">Approve, verify, and manage users</p>
+                    <a href="users.php" class="btn btn-primary btn-sm">Manage Users</a>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card quick-action-card">
+                  <div class="card-body">
+                    <h6>Student Records</h6>
+                    <p class="text-muted small">View and manage student data</p>
+                    <a href="students.php" class="btn btn-success btn-sm">View Students</a>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card quick-action-card">
+                  <div class="card-body">
+                    <h6>Bulk Import</h6>
+                    <p class="text-muted small">Import student data from CSV</p>
+                    <a href="students.php#import" class="btn btn-info btn-sm">Import Data</a>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card quick-action-card">
+                  <div class="card-body">
+                    <h6>Reports</h6>
+                    <p class="text-muted small">View system analytics</p>
+                    <a href="reports.php" class="btn btn-warning btn-sm">View Reports</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="col-md-6 mb-4">
+        <div class="card shadow">
+          <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">📋 Recent Activity</h5>
+          </div>
+          <div class="card-body">
+            <?php if ($recent_activity->num_rows > 0): ?>
+              <div class="list-group list-group-flush">
+                <?php while ($activity = $recent_activity->fetch_assoc()): ?>
+                  <div class="list-group-item">
+                    <div class="d-flex w-100 justify-content-between">
+                      <small class="text-muted"><?= $activity['action'] ?></small>
+                      <small><?= date('M j, g:i A', strtotime($activity['created_at'])) ?></small>
+                    </div>
+                    <?php if ($activity['email']): ?>
+                      <small class="text-muted">User: <?= $activity['email'] ?></small>
+                    <?php endif; ?>
+                  </div>
+                <?php endwhile; ?>
+              </div>
+              <div class="mt-3 text-center">
+                <a href="activity_log.php" class="btn btn-outline-dark btn-sm">View All Activity</a>
+              </div>
+            <?php else: ?>
+              <p class="text-muted">No recent activity</p>
+            <?php endif; ?>
+          </div>
+        </div>
       </div>
     </div>
+
+    <!-- Pending ID Requests -->
+    <?php if ($pending_requests->num_rows > 0): ?>
+    <div class="card shadow mb-4">
+      <div class="card-header bg-warning text-dark">
+        <h5 class="mb-0">⏳ Pending ID Requests</h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Student ID</th>
+                <th>Request Type</th>
+                <th>Submitted</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php while ($request = $pending_requests->fetch_assoc()): ?>
+              <tr>
+                <td>
+                  <?= htmlspecialchars($request['first_name'] . ' ' . $request['last_name']) ?><br>
+                  <small class="text-muted"><?= $request['email'] ?></small>
+                </td>
+                <td><span class="badge bg-secondary"><?= $request['student_id'] ?></span></td>
+                <td><span class="badge bg-info"><?= ucfirst($request['request_type']) ?></span></td>
+                <td><small><?= date('M j, g:i A', strtotime($request['created_at'])) ?></small></td>
+                <td>
+                  <a href="students.php?action=process_request&id=<?= $request['id'] ?>" class="btn btn-success btn-sm">Process</a>
+                </td>
+              </tr>
+              <?php endwhile; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <?php endif; ?>
   </div>
 
-  <script src="../assets/js/bootstrap.bundle.min.js"></script>
+  <script src="../../assets/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
