@@ -150,8 +150,20 @@ $request_type_filter = $_GET['request_type'] ?? '';
 
 // Build query with filters
 $query = "
-    SELECT ir.*, s.first_name, s.last_name, s.student_id, s.email, s.course, s.year_level, s.photo, s.contact_number, s.emergency_contact, s.blood_type,
-           u.user_id as user_exists
+    SELECT 
+        ir.*, 
+        ir.student_id as student_pk_id,  -- This is the student's primary key (e.g., 123)
+        s.first_name, 
+        s.last_name, 
+        s.student_id as student_id_number, -- This is the student's ID string (e.g., '2023-100')
+        s.email, 
+        s.course, 
+        s.year_level, 
+        s.photo, 
+        s.contact_number, 
+        s.emergency_contact, 
+        s.blood_type,
+        u.email as user_exists  -- <-- This line is now fixed
     FROM id_requests ir 
     JOIN student s ON ir.student_id = s.id 
     LEFT JOIN users u ON s.email = u.email
@@ -211,375 +223,422 @@ $stats = $conn->query("
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <title>ID Issuance | School ID System</title>
-  <link rel="stylesheet" href="../../assets/css/bootstrap.min.css">
-  <style>
+    <meta charset="UTF-8">
+    <title>ID Issuance | School ID System</title>
+    <link rel="stylesheet" href="../../assets/css/bootstrap.min.css">
+    <style>
     .request-card {
         transition: transform 0.2s;
         border-left: 4px solid #0d6efd;
     }
+
     .request-card:hover {
         transform: translateY(-2px);
     }
-    .status-pending { border-left-color: #ffc107; }
-    .status-approved { border-left-color: #198754; }
-    .status-completed { border-left-color: #0dcaf0; }
-    .status-rejected { border-left-color: #dc3545; }
+
+    .status-pending {
+        border-left-color: #ffc107;
+    }
+
+    .status-approved {
+        border-left-color: #198754;
+    }
+
+    .status-completed {
+        border-left-color: #0dcaf0;
+    }
+
+    .status-rejected {
+        border-left-color: #dc3545;
+    }
+
     .student-photo {
         width: 80px;
         height: 80px;
         object-fit: cover;
         border-radius: 5px;
     }
+
     .bulk-actions {
         background: #f8f9fa;
         border-radius: 5px;
         padding: 10px;
         margin-bottom: 15px;
     }
+
     .id-preview {
         max-width: 300px;
         border: 2px solid #dee2e6;
         border-radius: 10px;
         overflow: hidden;
     }
+
     .quick-actions {
         display: flex;
         gap: 5px;
         flex-wrap: wrap;
     }
+
     .quick-actions .btn {
         font-size: 0.75rem;
         padding: 0.25rem 0.5rem;
     }
-  </style>
+    </style>
 </head>
+
 <body class="bg-light">
-  <?php include '../../includes/header_admin.php'; ?>
-  
-  <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <h2>ID Card Issuance</h2>
-      <a href="admin.php" class="btn btn-secondary btn-sm">← Back to Dashboard</a>
-    </div>
+    <?php include '../../includes/header_admin.php'; ?>
 
-    <!-- Success/Error Messages -->
-    <?php if(isset($_SESSION['success'])): ?>
-      <div class="alert alert-success alert-dismissible fade show">
-        <?= $_SESSION['success']; unset($_SESSION['success']); ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-    <?php endif; ?>
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>ID Card Issuance</h2>
+            <a href="admin.php" class="btn btn-secondary btn-sm">← Back to Dashboard</a>
+        </div>
 
-    <!-- Statistics Cards -->
-    <div class="row mb-4">
-      <div class="col-md-3 mb-3">
-        <div class="card text-white bg-warning">
-          <div class="card-body text-center">
-            <h3><?= $stats['pending_requests'] ?></h3>
-            <p class="mb-0">Pending Requests</p>
-          </div>
+        <!-- Success/Error Messages -->
+        <?php if(isset($_SESSION['success'])): ?>
+        <div class="alert alert-success alert-dismissible fade show">
+            <?= $_SESSION['success']; unset($_SESSION['success']); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
-      </div>
-      <div class="col-md-3 mb-3">
-        <div class="card text-white bg-info">
-          <div class="card-body text-center">
-            <h3><?= $stats['approved_requests'] ?></h3>
-            <p class="mb-0">Approved</p>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3 mb-3">
-        <div class="card text-white bg-success">
-          <div class="card-body text-center">
-            <h3><?= $stats['completed_requests'] ?></h3>
-            <p class="mb-0">Completed</p>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3 mb-3">
-        <div class="card text-white bg-danger">
-          <div class="card-body text-center">
-            <h3><?= $stats['rejected_requests'] ?></h3>
-            <p class="mb-0">Rejected</p>
-          </div>
-        </div>
-      </div>
-    </div>
+        <?php endif; ?>
 
-    <!-- Quick Action Buttons -->
-    <div class="card shadow mb-4">
-      <div class="card-header bg-primary text-white">
-        <h5 class="mb-0">⚡ Quick Actions</h5>
-      </div>
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-md-4">
-            <div class="d-grid">
-              <a href="generate_id_bulk.php" class="btn btn-success">
-                📦 Generate IDs in Bulk
-              </a>
-              <small class="text-muted mt-1">Generate multiple IDs at once</small>
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card text-white bg-warning">
+                    <div class="card-body text-center">
+                        <h3><?= $stats['pending_requests'] ?></h3>
+                        <p class="mb-0">Pending Requests</p>
+                    </div>
+                </div>
             </div>
-          </div>
-          <div class="col-md-4">
-            <div class="d-grid">
-              <a href="id_templates.php" class="btn btn-info">
-                🎨 Manage ID Templates
-              </a>
-              <small class="text-muted mt-1">Customize ID card designs</small>
+            <div class="col-md-3 mb-3">
+                <div class="card text-white bg-info">
+                    <div class="card-body text-center">
+                        <h3><?= $stats['approved_requests'] ?></h3>
+                        <p class="mb-0">Approved</p>
+                    </div>
+                </div>
             </div>
-          </div>
-          <div class="col-md-4">
-            <div class="d-grid">
-              <a href="id_reports.php" class="btn btn-warning">
-                📊 ID Issuance Reports
-              </a>
-              <small class="text-muted mt-1">View printing statistics</small>
+            <div class="col-md-3 mb-3">
+                <div class="card text-white bg-success">
+                    <div class="card-body text-center">
+                        <h3><?= $stats['completed_requests'] ?></h3>
+                        <p class="mb-0">Completed</p>
+                    </div>
+                </div>
             </div>
-          </div>
+            <div class="col-md-3 mb-3">
+                <div class="card text-white bg-danger">
+                    <div class="card-body text-center">
+                        <h3><?= $stats['rejected_requests'] ?></h3>
+                        <p class="mb-0">Rejected</p>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Filters -->
-    <div class="card shadow mb-4">
-      <div class="card-header bg-primary text-white">
-        <h5 class="mb-0">🔍 Filter Requests</h5>
-      </div>
-      <div class="card-body">
-        <form method="GET" class="row g-3">
-          <div class="col-md-4">
-            <label class="form-label">Search</label>
-            <input type="text" name="search" class="form-control" 
-                   placeholder="Search by name, email, or student ID" 
-                   value="<?= htmlspecialchars($search) ?>">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Status</label>
-            <select name="status" class="form-select">
-              <option value="all" <?= $status_filter === 'all' ? 'selected' : '' ?>>All Status</option>
-              <option value="pending" <?= $status_filter === 'pending' ? 'selected' : '' ?>>Pending</option>
-              <option value="approved" <?= $status_filter === 'approved' ? 'selected' : '' ?>>Approved</option>
-              <option value="completed" <?= $status_filter === 'completed' ? 'selected' : '' ?>>Completed</option>
-              <option value="rejected" <?= $status_filter === 'rejected' ? 'selected' : '' ?>>Rejected</option>
-            </select>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Request Type</label>
-            <select name="request_type" class="form-select">
-              <option value="all" <?= $request_type_filter === 'all' ? 'selected' : '' ?>>All Types</option>
-              <option value="new" <?= $request_type_filter === 'new' ? 'selected' : '' ?>>New ID</option>
-              <option value="replacement" <?= $request_type_filter === 'replacement' ? 'selected' : '' ?>>Replacement</option>
-              <option value="update" <?= $request_type_filter === 'update' ? 'selected' : '' ?>>Update</option>
-            </select>
-          </div>
-          <div class="col-md-2 d-flex align-items-end">
-            <button type="submit" class="btn btn-primary me-2">Apply Filters</button>
-            <a href="admin_id.php" class="btn btn-outline-secondary">Clear</a>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- Bulk Actions -->
-    <form method="POST" id="bulkForm">
-      <div class="bulk-actions d-flex align-items-center gap-3 mb-3">
-        <select name="bulk_action" class="form-select w-auto" required>
-          <option value="">Bulk Actions</option>
-          <option value="approve">Approve Selected</option>
-          <option value="reject">Reject Selected</option>
-          <option value="complete">Mark as Completed</option>
-          <option value="generate">Generate IDs</option>
-        </select>
-        <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Are you sure you want to perform this bulk action?')">
-          Apply
-        </button>
-        <small class="text-muted">Select requests using checkboxes below</small>
-      </div>
-
-      <!-- ID Requests -->
-      <div class="card shadow">
-        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-          <h5 class="mb-0">🎫 ID Requests</h5>
-          <span class="badge bg-light text-dark">
-            <?= $id_requests->num_rows ?> request(s)
-          </span>
+        <!-- Quick Action Buttons -->
+        <div class="card shadow mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">⚡ Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="d-grid">
+                            <a href="generate_id_bulk.php" class="btn btn-success">
+                                📦 Generate IDs in Bulk
+                            </a>
+                            <small class="text-muted mt-1">Generate multiple IDs at once</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-grid">
+                            <a href="id_templates.php" class="btn btn-info">
+                                🎨 Manage ID Templates
+                            </a>
+                            <small class="text-muted mt-1">Customize ID card designs</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-grid">
+                            <a href="id_reports.php" class="btn btn-warning">
+                                📊 ID Issuance Reports
+                            </a>
+                            <small class="text-muted mt-1">View printing statistics</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-          <?php if ($id_requests->num_rows > 0): ?>
-            <div class="row">
-              <?php while ($request = $id_requests->fetch_assoc()): ?>
-                <div class="col-md-6 mb-4">
-                  <div class="card request-card status-<?= $request['status'] ?> h-100">
-                    <div class="card-body">
-                      <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div>
-                          <h6 class="card-title mb-1">
-                            <?= htmlspecialchars($request['first_name'] . ' ' . $request['last_name']) ?>
-                          </h6>
-                          <p class="text-muted mb-1"><?= $request['email'] ?></p>
-                          <span class="badge bg-secondary"><?= $request['student_id'] ?></span>
-                        </div>
-                        <div class="form-check">
-                          <input class="form-check-input" type="checkbox" name="selected_requests[]" value="<?= $request['id'] ?>">
-                        </div>
-                      </div>
-                      
-                      <div class="row">
-                        <div class="col-4">
-                          <img src="<?= $request['photo'] ? '../../uploads/' . htmlspecialchars($request['photo']) : '../../assets/img/default_user.png' ?>" 
-                               alt="Student Photo" class="student-photo w-100">
-                        </div>
-                        <div class="col-8">
-                          <div class="mb-2">
-                            <strong>Course:</strong> <?= htmlspecialchars($request['course'] ?? 'Not set') ?><br>
-                            <strong>Year:</strong> <?= htmlspecialchars($request['year_level'] ?? 'Not set') ?><br>
-                            <strong>Contact:</strong> <?= htmlspecialchars($request['contact_number'] ?? 'Not set') ?>
-                          </div>
-                          
-                          <div class="mb-2">
-                            <span class="badge bg-<?= 
+
+        <!-- Filters -->
+        <div class="card shadow mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">🔍 Filter Requests</h5>
+            </div>
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Search</label>
+                        <input type="text" name="search" class="form-control"
+                            placeholder="Search by name, email, or student ID" value="<?= htmlspecialchars($search) ?>">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Status</label>
+                        <select name="status" class="form-select">
+                            <option value="all" <?= $status_filter === 'all' ? 'selected' : '' ?>>All Status</option>
+                            <option value="pending" <?= $status_filter === 'pending' ? 'selected' : '' ?>>Pending
+                            </option>
+                            <option value="approved" <?= $status_filter === 'approved' ? 'selected' : '' ?>>Approved
+                            </option>
+                            <option value="completed" <?= $status_filter === 'completed' ? 'selected' : '' ?>>Completed
+                            </option>
+                            <option value="rejected" <?= $status_filter === 'rejected' ? 'selected' : '' ?>>Rejected
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Request Type</label>
+                        <select name="request_type" class="form-select">
+                            <option value="all" <?= $request_type_filter === 'all' ? 'selected' : '' ?>>All Types
+                            </option>
+                            <option value="new" <?= $request_type_filter === 'new' ? 'selected' : '' ?>>New ID</option>
+                            <option value="replacement" <?= $request_type_filter === 'replacement' ? 'selected' : '' ?>>
+                                Replacement</option>
+                            <option value="update" <?= $request_type_filter === 'update' ? 'selected' : '' ?>>Update
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">Apply Filters</button>
+                        <a href="admin_id.php" class="btn btn-outline-secondary">Clear</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Bulk Actions -->
+        <form method="POST" id="bulkForm">
+            <div class="bulk-actions d-flex align-items-center gap-3 mb-3">
+                <select name="bulk_action" class="form-select w-auto" required>
+                    <option value="">Bulk Actions</option>
+                    <option value="approve">Approve Selected</option>
+                    <option value="reject">Reject Selected</option>
+                    <option value="complete">Mark as Completed</option>
+                    <option value="generate">Generate IDs</option>
+                </select>
+                <button type="submit" class="btn btn-primary btn-sm"
+                    onclick="return confirm('Are you sure you want to perform this bulk action?')">
+                    Apply
+                </button>
+                <small class="text-muted">Select requests using checkboxes below</small>
+            </div>
+
+            <!-- ID Requests -->
+            <div class="card shadow">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">🎫 ID Requests</h5>
+                    <span class="badge bg-light text-dark">
+                        <?= $id_requests->num_rows ?> request(s)
+                    </span>
+                </div>
+                <div class="card-body">
+                    <?php if ($id_requests->num_rows > 0): ?>
+                    <div class="row">
+                        <?php while ($request = $id_requests->fetch_assoc()): ?>
+                        <div class="col-md-6 mb-4">
+                            <div class="card request-card status-<?= $request['status'] ?> h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <div>
+                                            <h6 class="card-title mb-1">
+                                                <?= htmlspecialchars($request['first_name'] . ' ' . $request['last_name']) ?>
+                                            </h6>
+                                            <p class="text-muted mb-1"><?= $request['email'] ?></p>
+                                            <span class="badge bg-secondary"><?= $request['student_id_number'] ?></span>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="selected_requests[]"
+                                                value="<?= $request['id'] ?>">
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-4">
+                                            <img src="<?= $request['photo'] ? '../../uploads/' . htmlspecialchars($request['photo']) : '../../assets/img/default_user.png' ?>"
+                                                alt="Student Photo" class="student-photo w-100">
+                                        </div>
+                                        <div class="col-8">
+                                            <div class="mb-2">
+                                                <strong>Course:</strong>
+                                                <?= htmlspecialchars($request['course'] ?? 'Not set') ?><br>
+                                                <strong>Year:</strong>
+                                                <?= htmlspecialchars($request['year_level'] ?? 'Not set') ?><br>
+                                                <strong>Contact:</strong>
+                                                <?= htmlspecialchars($request['contact_number'] ?? 'Not set') ?>
+                                            </div>
+
+                                            <div class="mb-2">
+                                                <span class="badge bg-<?= 
                               $request['status'] === 'pending' ? 'warning' : 
                               ($request['status'] === 'approved' ? 'info' : 
                               ($request['status'] === 'completed' ? 'success' : 'danger')) 
                             ?>">
-                              <?= ucfirst($request['status']) ?>
-                            </span>
-                            <span class="badge bg-primary"><?= ucfirst($request['request_type']) ?></span>
-                            <?php if (!$request['user_exists']): ?>
-                              <span class="badge bg-danger">No User Account</span>
-                            <?php endif; ?>
-                          </div>
-                          
-                          <?php if ($request['reason']): ?>
-                            <div class="mb-2">
-                              <small><strong>Reason:</strong> <?= htmlspecialchars($request['reason']) ?></small>
-                            </div>
-                          <?php endif; ?>
-                          
-                          <?php if ($request['admin_notes']): ?>
-                            <div class="mb-2">
-                              <small><strong>Admin Notes:</strong> <?= htmlspecialchars($request['admin_notes']) ?></small>
-                            </div>
-                          <?php endif; ?>
-                          
-                          <small class="text-muted">
-                            Submitted: <?= date('M j, Y g:i A', strtotime($request['created_at'])) ?>
-                          </small>
-                        </div>
-                      </div>
-                      
-                      <!-- Action Buttons -->
-                      <div class="mt-3">
-                        <div class="btn-group btn-group-sm w-100">
-                          <?php if ($request['status'] === 'pending'): ?>
-                            <a href="?action=approve&id=<?= $request['id'] ?>" class="btn btn-success">Approve</a>
-                            <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal" 
-                                    data-requestid="<?= $request['id'] ?>">Reject</button>
-                          <?php elseif ($request['status'] === 'approved'): ?>
-                            <a href="?action=generate_id&id=<?= $request['id'] ?>" class="btn btn-primary">Generate ID</a>
-                            <a href="?action=complete&id=<?= $request['id'] ?>" class="btn btn-success">Mark Complete</a>
-                          <?php elseif ($request['status'] === 'completed'): ?>
-                            <div class="quick-actions w-100">
-                              <a href="?view_id=<?= $request['student_id'] ?>" class="btn btn-info" target="_blank">👁️ View</a>
-                              <a href="?download_id=<?= $request['student_id'] ?>" class="btn btn-success">📥 Download</a>
-                              <a href="?print_id=<?= $request['student_id'] ?>" class="btn btn-warning">🖨️ Print</a>
-                              <a href="generate_id_card.php?student_id=<?= $request['student_id'] ?>&mode=email" class="btn btn-secondary">📧 Email</a>
-                            </div>
-                          <?php endif; ?>
-                          <a href="student_details.php?id=<?= $request['student_id'] ?>" class="btn btn-outline-dark mt-1">View Student</a>
-                        </div>
-                        
-                        <!-- ID Preview for Completed Requests -->
-                        <?php if ($request['status'] === 'completed'): ?>
-                          <div class="mt-2 p-2 border rounded">
-                            <small class="text-muted d-block mb-1">ID Preview:</small>
-                            <div class="id-preview mx-auto">
-                              <div class="bg-primary text-white p-2 text-center">
-                                <strong>SCHOOL ID</strong>
-                              </div>
-                              <div class="p-2">
-                                <div class="row">
-                                  <div class="col-4">
-                                    <img src="<?= $request['photo'] ? '../../uploads/' . htmlspecialchars($request['photo']) : '../../assets/img/default_user.png' ?>" 
-                                         class="w-100 rounded">
-                                  </div>
-                                  <div class="col-8">
-                                    <small><strong><?= htmlspecialchars($request['first_name'] . ' ' . $request['last_name']) ?></strong></small><br>
-                                    <small>ID: <?= $request['student_id'] ?></small><br>
-                                    <small><?= $request['course'] ?? 'N/A' ?></small>
-                                  </div>
+                                                    <?= ucfirst($request['status']) ?>
+                                                </span>
+                                                <span
+                                                    class="badge bg-primary"><?= ucfirst($request['request_type']) ?></span>
+                                                <?php if (!$request['user_exists']): ?>
+                                                <span class="badge bg-danger">No User Account</span>
+                                                <?php endif; ?>
+                                            </div>
+
+                                            <?php if ($request['reason']): ?>
+                                            <div class="mb-2">
+                                                <small><strong>Reason:</strong>
+                                                    <?= htmlspecialchars($request['reason']) ?></small>
+                                            </div>
+                                            <?php endif; ?>
+
+                                            <?php if ($request['admin_notes']): ?>
+                                            <div class="mb-2">
+                                                <small><strong>Admin Notes:</strong>
+                                                    <?= htmlspecialchars($request['admin_notes']) ?></small>
+                                            </div>
+                                            <?php endif; ?>
+
+                                            <small class="text-muted">
+                                                Submitted:
+                                                <?= date('M j, Y g:i A', strtotime($request['created_at'])) ?>
+                                            </small>
+                                        </div>
+                                    </div>
+
+                                    <!-- Action Buttons -->
+                                    <div class="mt-3">
+                                        <div class="btn-group btn-group-sm w-100">
+                                            <?php if ($request['status'] === 'pending'): ?>
+                                            <a href="?action=approve&id=<?= $request['id'] ?>"
+                                                class="btn btn-success">Approve</a>
+                                            <button type="button" class="btn btn-danger" data-bs-toggle="modal"
+                                                data-bs-target="#rejectModal"
+                                                data-requestid="<?= $request['id'] ?>">Reject</button>
+                                            <?php elseif ($request['status'] === 'approved'): ?>
+                                            <a href="?action=generate_id&id=<?= $request['id'] ?>"
+                                                class="btn btn-primary">Generate ID</a>
+                                            <a href="?action=complete&id=<?= $request['id'] ?>"
+                                                class="btn btn-success">Mark Complete</a>
+                                            <?php elseif ($request['status'] === 'completed'): ?>
+                                            <!-- In your action buttons section, update the links: -->
+                                            <div class="quick-actions w-100">
+                                                <a href="generate_id_card.php?student_id=<?= $request['student_pk_id'] ?>&mode=preview"
+                                                    target="_blank" class="btn btn-success" >👁️ View</a>
+                                                <a href="generate_id_card.php?student_id=<?= $request['student_pk_id'] ?>&mode=download" class="btn btn-success">
+                                                    📥 Download</a>
+                                                <a href="generate_id_card.php?student_id=<?= $request['student_pk_id'] ?>&mode=print"
+                                                    target="_blank" class="btn btn-success">🖨️ Print</a>
+                                                <a href="generate_id_card.php?email_id=<?= $request['student_pk_id'] ?>&template=id_template.html"
+                                                    class="btn btn-success">📧 Email</a>
+                                            </div>
+                                            <?php endif; ?>
+                                            <a href="student_details.php?id=<?= $request['student_id'] ?>"
+                                                class="btn btn-outline-dark mt-1">View Student</a>
+                                        </div>
+
+                                        <!-- ID Preview for Completed Requests -->
+                                        <?php if ($request['status'] === 'completed'): ?>
+                                        <div class="mt-2 p-2 border rounded">
+                                            <small class="text-muted d-block mb-1">ID Preview:</small>
+                                            <div class="id-preview mx-auto">
+                                                <div class="bg-primary text-white p-2 text-center">
+                                                    <strong>SCHOOL ID</strong>
+                                                </div>
+                                                <div class="p-2">
+                                                    <div class="row">
+                                                        <div class="col-4">
+                                                            <img src="<?= $request['photo'] ? '../../uploads/' . htmlspecialchars($request['photo']) : '../../assets/img/default_user.png' ?>"
+                                                                class="w-100 rounded">
+                                                        </div>
+                                                        <div class="col-8">
+                                                            <small><strong><?= htmlspecialchars($request['first_name'] . ' ' . $request['last_name']) ?></strong></small><br>
+                                                            <small>ID: <?= $request['student_id'] ?></small><br>
+                                                            <small><?= $request['course'] ?? 'N/A' ?></small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
-                              </div>
                             </div>
-                          </div>
-                        <?php endif; ?>
-                      </div>
+                        </div>
+                        <?php endwhile; ?>
                     </div>
-                  </div>
+                    <?php else: ?>
+                    <div class="text-center py-4">
+                        <p class="text-muted">No ID requests found matching your criteria.</p>
+                        <a href="admin_id.php" class="btn btn-primary">Clear Filters</a>
+                    </div>
+                    <?php endif; ?>
                 </div>
-              <?php endwhile; ?>
             </div>
-          <?php else: ?>
-            <div class="text-center py-4">
-              <p class="text-muted">No ID requests found matching your criteria.</p>
-              <a href="admin_id.php" class="btn btn-primary">Clear Filters</a>
-            </div>
-          <?php endif; ?>
-        </div>
-      </div>
-    </form>
-  </div>
-
-  <!-- Reject Modal -->
-  <div class="modal fade" id="rejectModal" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Reject ID Request</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <form method="GET" action="">
-          <div class="modal-body">
-            <input type="hidden" name="action" value="reject">
-            <input type="hidden" name="id" id="reject_request_id">
-            
-            <div class="mb-3">
-              <label class="form-label">Reason for Rejection</label>
-              <textarea name="reason" class="form-control" rows="3" placeholder="Please provide a reason for rejection..." required></textarea>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-danger">Reject Request</button>
-          </div>
         </form>
-      </div>
     </div>
-  </div>
 
-  <script src="../../assets/js/bootstrap.bundle.min.js"></script>
-  <script>
+    <!-- Reject Modal -->
+    <div class="modal fade" id="rejectModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Reject ID Request</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="GET" action="">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="reject">
+                        <input type="hidden" name="id" id="reject_request_id">
+
+                        <div class="mb-3">
+                            <label class="form-label">Reason for Rejection</label>
+                            <textarea name="reason" class="form-control" rows="3"
+                                placeholder="Please provide a reason for rejection..." required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger">Reject Request</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../assets/js/bootstrap.bundle.min.js"></script>
+    <script>
     // Reject Modal functionality
     const rejectModal = document.getElementById('rejectModal');
-    rejectModal.addEventListener('show.bs.modal', function (event) {
-      const button = event.relatedTarget;
-      const requestId = button.getAttribute('data-requestid');
-      document.getElementById('reject_request_id').value = requestId;
+    rejectModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const requestId = button.getAttribute('data-requestid');
+        document.getElementById('reject_request_id').value = requestId;
     });
 
     // Select all checkboxes
     function selectAllCheckboxes(source) {
-      const checkboxes = document.querySelectorAll('input[name="selected_requests[]"]');
-      checkboxes.forEach(checkbox => {
-        checkbox.checked = source.checked;
-      });
+        const checkboxes = document.querySelectorAll('input[name="selected_requests[]"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = source.checked;
+        });
     }
-  </script>
+    </script>
 </body>
+
 </html>
 
 <?php $stmt->close(); ?>
