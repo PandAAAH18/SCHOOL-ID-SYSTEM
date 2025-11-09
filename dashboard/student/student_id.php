@@ -190,7 +190,7 @@ $full_name = trim($student['first_name'] . ' ' . $student['last_name']);
             <div class="mb-3">
               <label class="form-label"><strong>Current Photo</strong></label>
               <div class="text-center">
-                <img src="<?= $student['photo'] ? '../../uploads/' . htmlspecialchars($student['photo']) : '../../assets/img/default_user.png' ?>" 
+                <img src="<?= $student['photo'] ? '../../uploads/student_photos/' . htmlspecialchars($student['photo']) : '../../assets/img/default_user.png' ?>" 
                      alt="Profile Photo" class="rounded-circle mb-2" width="120" height="120" style="object-fit: cover;">
                 <p class="text-muted">This photo will be used for your ID card</p>
               </div>

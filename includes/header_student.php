@@ -6,7 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $header_full_name = trim(($_SESSION['student_first_name'] ?? '') . ' ' . ($_SESSION['student_last_name'] ?? ''));
 $header_photo = !empty($_SESSION['student_photo'])
-    ? '../../uploads/' . htmlspecialchars($_SESSION['student_photo'])
+    ? '../../uploads/student_photos/' . htmlspecialchars($_SESSION['student_photo'])
     : '../../assets/img/default_user.png';
 ?>
 <nav class="navbar navbar-expand-lg navbar-dark bg-success">

@@ -2,76 +2,83 @@
 session_start();
 include 'db_connect.php';
 
-// Redirect if not logged in
 if (!isset($_SESSION['student_id'])) {
     header("Location: ../index.php");
     exit();
 }
+$student_id = (int)$_SESSION['student_id'];
 
-$student_id = $_SESSION['student_id'];
+/* ---------- helper ---------- */
+function uploadFile($field, $allowed, $maxBytes, &$destName, $subFolder)
+{
+    if (!isset($_FILES[$field]) || $_FILES[$field]['error'] === UPLOAD_ERR_NO_FILE) return true; // skip
 
-// Get form values
-$first_name = mysqli_real_escape_string($conn, $_POST['first_name']);
-$last_name = mysqli_real_escape_string($conn, $_POST['last_name']);
-$year_level = mysqli_real_escape_string($conn, $_POST['year_level']);
-$course = mysqli_real_escape_string($conn, $_POST['course']);
-$contact_number = mysqli_real_escape_string($conn, $_POST['contact_number']);
-$address = mysqli_real_escape_string($conn, $_POST['address']);
+    $file = $_FILES[$field];
+    if (!in_array($file['type'], $allowed)) return false;
+    if ($file['size'] > $maxBytes) return false;
 
-// Handle photo upload
-$photo_path = null; // default
-if (isset($_FILES['photo']) && $_FILES['photo']['error'] !== UPLOAD_ERR_NO_FILE) {
-    $photo = $_FILES['photo'];
-    $allowed_types = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
-    
-    if (!in_array($photo['type'], $allowed_types)) {
-        $_SESSION['error'] = "Invalid image format. Allowed: jpg, jpeg, png, gif.";
-        header("Location: ../complete_profile.php");
-        exit();
-    }
+    $ext      = pathinfo($file['name'], PATHINFO_EXTENSION);
+    $destName = $field . '_' . $student_id . '_' . time() . '.' . $ext;
+    $dir      = __DIR__ . '/../uploads/' . $subFolder . '/';
 
-    // Move uploaded file
-    $ext = pathinfo($photo['name'], PATHINFO_EXTENSION);
-    $new_name = 'student_' . $student_id . '_' . time() . '.' . $ext;
-    $upload_dir = '../uploads/';
-    
-    // Create directory if it doesn't exist
-    if (!is_dir($upload_dir)) {
-        mkdir($upload_dir, 0755, true);
-    }
-    
-    if (!move_uploaded_file($photo['tmp_name'], $upload_dir . $new_name)) {
-        $_SESSION['error'] = "Error uploading photo.";
-        header("Location: ../complete_profile.php");
-        exit();
-    }
-
-    $photo_path = $new_name; // save only filename in DB
+    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    return move_uploaded_file($file['tmp_name'], $dir . $destName);
 }
 
-// Build update query
-if ($photo_path) {
-    $stmt = $conn->prepare("UPDATE student SET first_name=?, last_name=?, year_level=?, course=?, contact_number=?, address=?, photo=? WHERE id=?");
-    $stmt->bind_param("sssssssi", $first_name, $last_name, $year_level, $course, $contact_number, $address, $photo_path, $student_id);
-} else {
-    $stmt = $conn->prepare("UPDATE student SET first_name=?, last_name=?, year_level=?, course=?, contact_number=?, address=? WHERE id=?");
-    $stmt->bind_param("ssssssi", $first_name, $last_name, $year_level, $course, $contact_number, $address, $student_id);
+/* ---------- basic data ---------- */
+$first_name      = mysqli_real_escape_string($conn, $_POST['first_name']);
+$last_name       = mysqli_real_escape_string($conn, $_POST['last_name']);
+$year_level      = mysqli_real_escape_string($conn, $_POST['year_level']);
+$course          = mysqli_real_escape_string($conn, $_POST['course']);
+$contact_number  = mysqli_real_escape_string($conn, $_POST['contact_number']);
+$address         = mysqli_real_escape_string($conn, $_POST['address']);
+
+/* ---------- uploads ---------- */
+$allowed = ['image/jpeg','image/png','image/jpg','image/gif'];
+$max     = 2 * 1024 * 1024; // 2 MB
+
+$photo_path = $cor_path = $signature_path = null;
+
+/* photo */
+if (!uploadFile('photo', $allowed, $max, $photo_path, 'student_photos')) {
+    $_SESSION['error'] = 'Photo upload failed (≤2 MB, jpg/png/gif only).';
+    header("Location: ../complete_profile.php"); exit();
 }
 
-// Execute
+/* COR */
+if (!uploadFile('cor', $allowed, $max, $cor_path, 'student_cors')) {
+    $_SESSION['error'] = 'COR upload failed (≤2 MB, jpg/png/gif only).';
+    header("Location: ../complete_profile.php"); exit();
+}
+
+/* signature */
+if (!uploadFile('signature', $allowed, $max, $signature_path, 'student_signatures')) {
+    $_SESSION['error'] = 'Signature upload failed (≤2 MB, jpg/png/gif only).';
+    header("Location: ../complete_profile.php"); exit();
+}
+
+/* ---------- build dynamic update ---------- */
+$fields = ["first_name=?", "last_name=?", "year_level=?", "course=?", "contact_number=?", "address=?"];
+$values = [$first_name, $last_name, $year_level, $course, $contact_number, $address];
+$types  = "ssssss";
+
+if ($photo_path)     { $fields[] = "photo=?";     $values[] = $photo_path;     $types .= "s"; }
+if ($cor_path)       { $fields[] = "cor=?";       $values[] = $cor_path;       $types .= "s"; }
+if ($signature_path) { $fields[] = "signature=?"; $values[] = $signature_path; $types .= "s"; }
+
+$values[] = $student_id;   // last placeholder for WHERE
+$types   .= "i";
+
+$sql = "UPDATE student SET " . implode(", ", $fields) . " WHERE id=?";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param($types, ...$values);
+
 if ($stmt->execute()) {
     $_SESSION['success'] = "Profile updated successfully!";
-    unset($_SESSION['student_id']); // remove temporary session
-    
-    // ✅ FIXED: Keep the original user_id, role, and email from login
-    // Don't overwrite $_SESSION['user_id'] - it's already set from login!
-    // The user_id should remain the one from the 'users' table, not the student table
-    
+    unset($_SESSION['student_id']);
     header("Location: ../dashboard/student_dashboard.php");
-    exit();
 } else {
-    $_SESSION['error'] = "Error updating profile: " . $conn->error;
+    $_SESSION['error'] = "DB error: " . $conn->error;
     header("Location: ../complete_profile.php");
-    exit();
 }
 ?>

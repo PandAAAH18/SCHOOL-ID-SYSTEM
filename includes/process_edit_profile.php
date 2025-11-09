@@ -21,46 +21,35 @@ $emergency_contact = mysqli_real_escape_string($conn, $_POST['emergency_contact'
 $address = mysqli_real_escape_string($conn, $_POST['address']);
 $blood_type = mysqli_real_escape_string($conn, $_POST['blood_type']);
 
-// Handle photo upload (optional)
+/* ---------- photo upload ---------- */
 $photo_path = null;
 if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
     $photo = $_FILES['photo'];
-    $allowed_types = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
-    
-    if (!in_array($photo['type'], $allowed_types)) {
-        $_SESSION['error'] = "Invalid image format. Allowed: jpg, jpeg, png, gif.";
-        header("Location: ../dashboard/student/edit_student_profile.php");
-        exit();
-    }
+    $allowed = ['image/jpeg','image/png','image/jpg','image/gif'];
 
-    // Check file size (max 2MB)
-    if ($photo['size'] > 2097152) {
-        $_SESSION['error'] = "File too large. Maximum size is 2MB.";
-        header("Location: ../dashboard/student/edit_student_profile.php");
-        exit();
-    }
+    // validate type & size
+    if (!in_array($photo['type'], $allowed))
+        { $_SESSION['error'] = 'Invalid image format.'; header('Location: ../dashboard/student/edit_student_profile.php'); exit(); }
+    if ($photo['size'] > 2_097_152)
+        { $_SESSION['error'] = 'File too large (max 2 MB).'; header('Location: ../dashboard/student/edit_student_profile.php'); exit(); }
 
-    // Get student ID for filename
-    $student_query = mysqli_query($conn, "SELECT id FROM student WHERE email='$email' LIMIT 1");
-    $student = mysqli_fetch_assoc($student_query);
+    // student id for filename
+    $stmt = $conn->prepare('SELECT id FROM student WHERE email = ?');
+    $stmt->bind_param('s', $email);
+    $stmt->execute();
+    $student = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
 
-    // Move uploaded file
-    $ext = pathinfo($photo['name'], PATHINFO_EXTENSION);
+    $ext      = pathinfo($photo['name'], PATHINFO_EXTENSION);
     $new_name = 'student_' . $student['id'] . '_' . time() . '.' . $ext;
-    $upload_dir = '../uploads/';
-    
-    // Create directory if it doesn't exist
-    if (!is_dir($upload_dir)) {
-        mkdir($upload_dir, 0755, true);
-    }
-    
-    if (!move_uploaded_file($photo['tmp_name'], $upload_dir . $new_name)) {
-        $_SESSION['error'] = "Error uploading photo.";
-        header("Location: ../dashboard/student/edit_student_profile.php");
-        exit();
-    }
+    $upload_dir = __DIR__ . '/../uploads/student_photos/';   // note trailing slash
 
-    $photo_path = $new_name;
+    if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+
+    if (move_uploaded_file($photo['tmp_name'], $upload_dir . $new_name))
+        $photo_path = $new_name;          // store only filename
+    else
+        { $_SESSION['error'] = 'Upload failed.'; header('Location: ../dashboard/student/edit_student_profile.php'); exit(); }
 }
 
 // Build update query

@@ -58,7 +58,7 @@ $full_name = trim($student['first_name'] . ' ' . $student['last_name']);
       <div class="card-body">
         <div class="row">
           <div class="col-md-4 text-center">
-            <img src="<?= $student['photo'] ? '../../uploads/' . htmlspecialchars($student['photo']) : '../../assets/img/default_user.png' ?>" 
+            <img src="<?= $student['photo'] ? '../../uploads/student_photos/' . htmlspecialchars($student['photo']) : '../../assets/img/default_user.png' ?>" 
                  alt="Profile Photo" class="rounded-circle mb-3" width="120" height="120">
           </div>
           <div class="col-md-8">

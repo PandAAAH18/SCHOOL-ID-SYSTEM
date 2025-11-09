@@ -2,223 +2,132 @@
 session_start();
 require_once("../../includes/db_connect.php");
 
-// Check if user is logged in and is an admin
+/* ---------- auth ---------- */
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-  header("Location: ../index.php");
-  exit();
+    header("Location: ../index.php"); exit();
 }
 
-// Handle ID issuance actions
-if (isset($_GET['action']) && isset($_GET['id'])) {
-    $request_id = intval($_GET['id']);
-    $admin_id = $_SESSION['user_id'];
-    
-    if ($_GET['action'] === 'approve') {
-        // Update request status to approved
-        $stmt = $conn->prepare("UPDATE id_requests SET status = 'approved', updated_at = NOW() WHERE id = ?");
-        $stmt->bind_param("i", $request_id);
-        $stmt->execute();
-        $stmt->close();
-        
-        // Log activity
-        $conn->query("INSERT INTO activity_logs (admin_id, action, target_user) VALUES ($admin_id, 'Approved ID request #$request_id', 0)");
-        $_SESSION['success'] = "ID request approved successfully!";
-        
-    } elseif ($_GET['action'] === 'reject') {
-        $reason = $_GET['reason'] ?? 'No reason provided';
-        
-        // Update request status to rejected
-        $stmt = $conn->prepare("UPDATE id_requests SET status = 'rejected', admin_notes = ?, updated_at = NOW() WHERE id = ?");
-        $stmt->bind_param("si", $reason, $request_id);
-        $stmt->execute();
-        $stmt->close();
-        
-        // Log activity
-        $conn->query("INSERT INTO activity_logs (admin_id, action, target_user) VALUES ($admin_id, 'Rejected ID request #$request_id', 0)");
-        $_SESSION['success'] = "ID request rejected successfully!";
-        
-    } elseif ($_GET['action'] === 'complete') {
-        // Update request status to completed (ID issued)
-        $stmt = $conn->prepare("UPDATE id_requests SET status = 'completed', updated_at = NOW() WHERE id = ?");
-        $stmt->bind_param("i", $request_id);
-        $stmt->execute();
-        $stmt->close();
-        
-        // Log activity
-        $conn->query("INSERT INTO activity_logs (admin_id, action, target_user) VALUES ($admin_id, 'Completed ID issuance for request #$request_id', 0)");
-        $_SESSION['success'] = "ID marked as completed/issued!";
-        
-    } elseif ($_GET['action'] === 'generate_id') {
-        // Generate and issue ID
-        $request_id = intval($_GET['id']);
-        
-        // Get request details
-        $request_stmt = $conn->prepare("
-            SELECT ir.*, s.first_name, s.last_name, s.student_id, s.email, s.course, s.year_level, s.photo, s.emergency_contact, s.blood_type, s.address
-            FROM id_requests ir 
-            JOIN student s ON ir.student_id = s.id 
-            WHERE ir.id = ?
-        ");
-        $request_stmt->bind_param("i", $request_id);
-        $request_stmt->execute();
-        $request_result = $request_stmt->get_result();
-        $request_data = $request_result->fetch_assoc();
-        $request_stmt->close();
-        
-        if ($request_data) {
-            // Update request status to completed
-            $stmt = $conn->prepare("UPDATE id_requests SET status = 'completed', updated_at = NOW() WHERE id = ?");
-            $stmt->bind_param("i", $request_id);
+/* ---------- helper : run UPDATE + log in one call ---------- */
+function execUpdate($sql, $types = '', $vals = [], $logMsg = ''){
+    global $conn, $admin_id;
+    $stmt = $conn->prepare($sql);
+    if ($types) $stmt->bind_param($types, ...$vals);
+    $stmt->execute();
+    $stmt->close();
+    if ($logMsg) $conn->query("INSERT INTO activity_logs (admin_id, action, target_user) VALUES ($admin_id, '$logMsg', 0)");
+}
+
+$admin_id = $_SESSION['user_id'];
+
+/* ---------- single-action GET ---------- */
+if (isset($_GET['action'], $_GET['id'])) {
+    $id = intval($_GET['id']);
+    switch ($_GET['action']) {
+        case 'approve':
+            execUpdate("UPDATE id_requests SET status='approved', updated_at=NOW() WHERE id=?", 'i', [$id], "Approved ID request #$id");
+            $_SESSION['success'] = "ID request approved successfully!";
+            break;
+
+        case 'reject':
+            $reason = $_GET['reason'] ?? 'No reason provided';
+            execUpdate("UPDATE id_requests SET status='rejected', admin_notes=?, updated_at=NOW() WHERE id=?", 'si', [$reason, $id], "Rejected ID request #$id");
+            $_SESSION['success'] = "ID request rejected successfully!";
+            break;
+
+        case 'complete':
+            execUpdate("UPDATE id_requests SET status='completed', updated_at=NOW() WHERE id=?", 'i', [$id], "Completed ID issuance for request #$id");
+            $_SESSION['success'] = "ID marked as completed/issued!";
+            break;
+
+        case 'generate_id':
+            $stmt = $conn->prepare("SELECT s.email, s.first_name, s.last_name
+                                    FROM id_requests ir JOIN student s ON ir.student_id = s.id WHERE ir.id=?");
+            $stmt->bind_param('i', $id);
             $stmt->execute();
+            $st = $stmt->get_result()->fetch_assoc();
             $stmt->close();
-            
-            // Log activity
-            $conn->query("INSERT INTO activity_logs (admin_id, action, target_user) VALUES ($admin_id, 'Generated ID for student: {$request_data['email']}', 0)");
-            $_SESSION['success'] = "ID generated successfully for {$request_data['first_name']} {$request_data['last_name']}!";
-        }
+
+            execUpdate("UPDATE id_requests SET status='completed', updated_at=NOW() WHERE id=?", 'i', [$id],
+                       "Generated ID for student: {$st['email']}");
+            $_SESSION['success'] = "ID generated successfully for {$st['first_name']} {$st['last_name']}!";
+            break;
     }
-    
-    header("Location: admin_id.php");
-    exit();
+    header("Location: admin_id.php"); exit();
 }
 
-// Handle ID viewing/downloading
-if (isset($_GET['view_id'])) {
-    $student_id = $_GET['view_id'];
-    header("Location: generate_id_card.php?student_id=" . $student_id . "&mode=preview");
-    exit();
+/* ---------- redirect helpers ---------- */
+foreach (['view_id','download_id','print_id'] as $k) {
+    if (isset($_GET[$k])) {
+        $mode = str_replace('_id','', $k);
+        header("Location: generate_id_card.php?student_id=".intval($_GET[$k])."&mode=$mode"); exit();
+    }
 }
 
-if (isset($_GET['download_id'])) {
-    $student_id = $_GET['download_id'];
-    header("Location: generate_id_card.php?student_id=" . $student_id . "&mode=download");
-    exit();
-}
-
-if (isset($_GET['print_id'])) {
-    $student_id = $_GET['print_id'];
-    header("Location: generate_id_card.php?student_id=" . $student_id . "&mode=print");
-    exit();
-}
-
-// Handle bulk actions
-if (isset($_POST['bulk_action']) && isset($_POST['selected_requests'])) {
-    $bulk_action = $_POST['bulk_action'];
-    $selected_requests = $_POST['selected_requests'];
-    $admin_id = $_SESSION['user_id'];
+/* ---------- bulk POST ---------- */
+if (isset($_POST['bulk_action'], $_POST['selected_requests'])) {
+    $action = $_POST['bulk_action'];
     $processed = 0;
-    
-    foreach ($selected_requests as $request_id) {
-        $request_id = intval($request_id);
-        
-        if ($bulk_action === 'approve') {
-            $stmt = $conn->prepare("UPDATE id_requests SET status = 'approved', updated_at = NOW() WHERE id = ?");
-            $stmt->bind_param("i", $request_id);
-            $stmt->execute();
-            $stmt->close();
-            $processed++;
-            
-        } elseif ($bulk_action === 'reject') {
-            $stmt = $conn->prepare("UPDATE id_requests SET status = 'rejected', updated_at = NOW() WHERE id = ?");
-            $stmt->bind_param("i", $request_id);
-            $stmt->execute();
-            $stmt->close();
-            $processed++;
-            
-        } elseif ($bulk_action === 'complete') {
-            $stmt = $conn->prepare("UPDATE id_requests SET status = 'completed', updated_at = NOW() WHERE id = ?");
-            $stmt->bind_param("i", $request_id);
-            $stmt->execute();
-            $stmt->close();
-            $processed++;
+    foreach ($_POST['selected_requests'] as $rid) {
+        $rid = intval($rid);
+        switch ($action) {
+            case 'approve': execUpdate("UPDATE id_requests SET status='approved', updated_at=NOW() WHERE id=?", 'i', [$rid]); break;
+            case 'reject':  execUpdate("UPDATE id_requests SET status='rejected', updated_at=NOW() WHERE id=?", 'i', [$rid]); break;
+            case 'complete':execUpdate("UPDATE id_requests SET status='completed', updated_at=NOW() WHERE id=?", 'i', [$rid]); break;
         }
+        $processed++;
     }
-    
-    if ($processed > 0) {
-        $conn->query("INSERT INTO activity_logs (admin_id, action, target_user) VALUES ($admin_id, 'Bulk $bulk_action: $processed ID requests', 0)");
+    if ($processed) {
+        $conn->query("INSERT INTO activity_logs (admin_id, action, target_user) VALUES ($admin_id, 'Bulk $action: $processed requests', 0)");
         $_SESSION['success'] = "Bulk action completed! $processed requests processed.";
     }
-    
-    header("Location: admin_id.php");
-    exit();
+    header("Location: admin_id.php"); exit();
 }
 
-// Get filter parameters
-$status_filter = $_GET['status'] ?? 'pending';
-$search = $_GET['search'] ?? '';
-$request_type_filter = $_GET['request_type'] ?? '';
+/* ---------- filters / stats ---------- */
+$status_filter   = $_GET['status']   ?? 'pending';
+$search          = $_GET['search']   ?? '';
+$request_type    = $_GET['request_type'] ?? '';
 
-// Build query with filters
-$query = "
-    SELECT 
-        ir.*, 
-        ir.student_id as student_pk_id,  -- This is the student's primary key (e.g., 123)
-        s.first_name, 
-        s.last_name, 
-        s.student_id as student_id_number, -- This is the student's ID string (e.g., '2023-100')
-        s.email, 
-        s.course, 
-        s.year_level, 
-        s.photo, 
-        s.contact_number, 
-        s.emergency_contact, 
-        s.blood_type,
-        u.email as user_exists  -- <-- This line is now fixed
-    FROM id_requests ir 
-    JOIN student s ON ir.student_id = s.id 
-    LEFT JOIN users u ON s.email = u.email
-    WHERE 1=1
-";
+$params = []; $types = '';
+$query  = "SELECT ir.*, ir.student_id AS student_pk_id, s.first_name, s.last_name,
+                  s.student_id AS student_id_number, s.email, s.course, s.year_level,
+                  s.photo, s.contact_number, s.emergency_contact, s.blood_type,
+                  u.email AS user_exists
+           FROM id_requests ir JOIN student s ON ir.student_id = s.id
+           LEFT JOIN users u ON s.email = u.email WHERE 1=1";
 
-$params = [];
-$types = '';
-
-// Add status filter
-if (!empty($status_filter) && $status_filter !== 'all') {
-    $query .= " AND ir.status = ?";
-    $params[] = $status_filter;
-    $types .= 's';
+if ($status_filter !== 'all') {
+    $query .= " AND ir.status = ?"; $params[] = $status_filter; $types .= 's';
 }
-
-// Add search filter
-if (!empty($search)) {
-    $query .= " AND (s.email LIKE ? OR s.first_name LIKE ? OR s.last_name LIKE ? OR s.student_id LIKE ?)";
-    $search_term = "%$search%";
-    $params[] = $search_term;
-    $params[] = $search_term;
-    $params[] = $search_term;
-    $params[] = $search_term;
-    $types .= 'ssss';
+if ($search) {
+    $like = "%$search%";
+    $query .= " AND (s.first_name LIKE ? OR s.last_name LIKE ? OR s.email LIKE ? OR s.student_id LIKE ?)";
+    array_push($params, $like, $like, $like, $like); $types .= 'ssss';
 }
-
-// Add request type filter
-if (!empty($request_type_filter) && $request_type_filter !== 'all') {
-    $query .= " AND ir.request_type = ?";
-    $params[] = $request_type_filter;
-    $types .= 's';
+if ($request_type !== 'all') {
+    $query .= " AND ir.request_type = ?"; $params[] = $request_type; $types .= 's';
 }
-
 $query .= " ORDER BY ir.created_at DESC";
 
-// Prepare and execute query
 $stmt = $conn->prepare($query);
-if (!empty($params)) {
-    $stmt->bind_param($types, ...$params);
-}
+if ($types) $stmt->bind_param($types, ...$params);
 $stmt->execute();
 $id_requests = $stmt->get_result();
 
-// Get statistics for dashboard
 $stats = $conn->query("
     SELECT 
-        (SELECT COUNT(*) FROM id_requests WHERE status = 'pending') as pending_requests,
-        (SELECT COUNT(*) FROM id_requests WHERE status = 'approved') as approved_requests,
-        (SELECT COUNT(*) FROM id_requests WHERE status = 'completed') as completed_requests,
-        (SELECT COUNT(*) FROM id_requests WHERE status = 'rejected') as rejected_requests,
-        (SELECT COUNT(*) FROM id_requests WHERE request_type = 'new') as new_requests,
-        (SELECT COUNT(*) FROM id_requests WHERE request_type = 'replacement') as replacement_requests,
-        (SELECT COUNT(*) FROM id_requests WHERE request_type = 'update') as update_requests
+        SUM(status='pending')   AS pending_requests,
+        SUM(status='approved')  AS approved_requests,
+        SUM(status='completed') AS completed_requests,
+        SUM(status='rejected')  AS rejected_requests,
+        COALESCE(SUM(request_type='new'),0)         AS new_requests,
+        COALESCE(SUM(request_type='replacement'),0) AS replacement_requests,
+        COALESCE(SUM(request_type='update'),0)      AS update_requests
+    FROM id_requests
 ")->fetch_assoc();
+
+/* ---------- cast every value to int ---------- */
+$stats = array_map(fn($v) => (int)$v, $stats);
 ?>
 
 <!DOCTYPE html>
@@ -350,7 +259,7 @@ $stats = $conn->query("
                 <div class="row g-3">
                     <div class="col-md-4">
                         <div class="d-grid">
-                            <a href="generate_id_bulk.php" class="btn btn-success">
+                            <a href="bulk_approved.php" class="btn btn-success">
                                 📦 Generate IDs in Bulk
                             </a>
                             <small class="text-muted mt-1">Generate multiple IDs at once</small>
@@ -405,13 +314,11 @@ $stats = $conn->query("
                     <div class="col-md-3">
                         <label class="form-label">Request Type</label>
                         <select name="request_type" class="form-select">
-                            <option value="all" <?= $request_type_filter === 'all' ? 'selected' : '' ?>>All Types
-                            </option>
-                            <option value="new" <?= $request_type_filter === 'new' ? 'selected' : '' ?>>New ID</option>
-                            <option value="replacement" <?= $request_type_filter === 'replacement' ? 'selected' : '' ?>>
+                            <option value="all" <?= ($request_type === 'all') ? 'selected' : '' ?>>All Types</option>
+                            <option value="new" <?= ($request_type === 'new') ? 'selected' : '' ?>>New ID</option>
+                            <option value="replacement" <?= ($request_type === 'replacement') ? 'selected' : '' ?>>
                                 Replacement</option>
-                            <option value="update" <?= $request_type_filter === 'update' ? 'selected' : '' ?>>Update
-                            </option>
+                            <option value="update" <?= ($request_type === 'update') ? 'selected' : '' ?>>Update</option>
                         </select>
                     </div>
                     <div class="col-md-2 d-flex align-items-end">
@@ -470,7 +377,7 @@ $stats = $conn->query("
 
                                     <div class="row">
                                         <div class="col-4">
-                                            <img src="<?= $request['photo'] ? '../../uploads/' . htmlspecialchars($request['photo']) : '../../assets/img/default_user.png' ?>"
+                                            <img src="<?= $request['photo'] ? '../../uploads/student_photos/' . htmlspecialchars($request['photo']) : '../../assets/img/default_user.png' ?>"
                                                 alt="Student Photo" class="student-photo w-100">
                                         </div>
                                         <div class="col-8">
@@ -537,8 +444,9 @@ $stats = $conn->query("
                                             <!-- In your action buttons section, update the links: -->
                                             <div class="quick-actions w-100">
                                                 <a href="generate_id_card.php?student_id=<?= $request['student_pk_id'] ?>&mode=preview"
-                                                    target="_blank" class="btn btn-success" >👁️ View</a>
-                                                <a href="generate_id_card.php?student_id=<?= $request['student_pk_id'] ?>&mode=download" class="btn btn-success">
+                                                    target="_blank" class="btn btn-success">👁️ View</a>
+                                                <a href="generate_id_card.php?student_id=<?= $request['student_pk_id'] ?>&mode=download"
+                                                    class="btn btn-success">
                                                     📥 Download</a>
                                                 <a href="generate_id_card.php?student_id=<?= $request['student_pk_id'] ?>&mode=print"
                                                     target="_blank" class="btn btn-success">🖨️ Print</a>
@@ -551,29 +459,71 @@ $stats = $conn->query("
                                         </div>
 
                                         <!-- ID Preview for Completed Requests -->
-                                        <?php if ($request['status'] === 'completed'): ?>
+                                        <?php if ($request['status'] === 'completed'):
+    /* fetch student row once (we only have the request row) */
+    $sigStmt = $conn->prepare("SELECT signature, first_name, last_name, student_id, course, year_level, blood_type, emergency_contact FROM student WHERE id = ?");
+    $sigStmt->bind_param('i', $request['student_pk_id']);
+    $sigStmt->execute();
+    $stu = $sigStmt->get_result()->fetch_assoc();
+    $sigStmt->close();
+
+    $photoPath = $request['photo'] ? '../../uploads/student_photos/'.htmlspecialchars($request['photo'])
+                                   : '../../assets/img/default_user.png';
+    $signPath  = $stu['signature'] ? '../../uploads/student_signatures/'.htmlspecialchars($stu['signature'])
+                                   : '../../assets/img/default_sign.png';
+    $bgPath    = '../../assets/img/bg.jpg';
+    $logoPath  = '../../assets/img/kldlogo.png';
+?>
                                         <div class="mt-2 p-2 border rounded">
-                                            <small class="text-muted d-block mb-1">ID Preview:</small>
-                                            <div class="id-preview mx-auto">
-                                                <div class="bg-primary text-white p-2 text-center">
-                                                    <strong>SCHOOL ID</strong>
-                                                </div>
-                                                <div class="p-2">
-                                                    <div class="row">
-                                                        <div class="col-4">
-                                                            <img src="<?= $request['photo'] ? '../../uploads/' . htmlspecialchars($request['photo']) : '../../assets/img/default_user.png' ?>"
-                                                                class="w-100 rounded">
+                                            <small class="text-muted d-block mb-1">ID Preview (actual size):</small>
+                                            <div class="id-preview mx-auto"
+                                                style="max-width:315px;background:#fff;border:1px solid #dee2e6;border-radius:8px;overflow:hidden">
+                                                <div
+                                                    style="width:315px;height:201.6px;position:relative;font-family:Arial,Helvetica,sans-serif;color:#000">
+
+                                                    <!-- FRONT -->
+                                                    <div
+                                                        style="width:100.8px;height:151.2px;position:absolute;top:25.2px;left:56.7px;background-size:cover;background-image:url(<?= $bgPath ?>);border-radius:4px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.35);display:flex;flex-direction:column;align-items:center">
+                                                        <img src="<?= $logoPath ?>"
+                                                            style="height:21px;margin:6px 0 3px">
+                                                        <img src="<?= $photoPath ?>"
+                                                            style="width:36px;height:45px;object-fit:cover;border:1px solid #fff;border-radius:2px;margin:3px 0">
+                                                        <div
+                                                            style="font-size:6.6px;font-weight:bold;margin-top:1px;text-align:center;line-height:1.1">
+                                                            <?= htmlspecialchars($stu['first_name']) ?><br><?= htmlspecialchars($stu['last_name']) ?>
                                                         </div>
-                                                        <div class="col-8">
-                                                            <small><strong><?= htmlspecialchars($request['first_name'] . ' ' . $request['last_name']) ?></strong></small><br>
-                                                            <small>ID: <?= $request['student_id'] ?></small><br>
-                                                            <small><?= $request['course'] ?? 'N/A' ?></small>
+                                                        <div style="font-size:5.4px">
+                                                            <?= htmlspecialchars($stu['student_id']) ?></div>
+                                                        <div style="font-size:4.8px">
+                                                            <?= htmlspecialchars($stu['course']) ?> - Yr
+                                                            <?= htmlspecialchars($stu['year_level']) ?></div>
+                                                        <div
+                                                            style="font-size:4.2px;align-self:flex-start;margin-left:8px;margin-top:auto;margin-bottom:9px">
+                                                            Blood:
+                                                            <?= htmlspecialchars($stu['blood_type']) ?><br>Emergency:
+                                                            <?= htmlspecialchars($stu['emergency_contact']) ?></div>
+                                                    </div>
+
+                                                    <!-- BACK -->
+                                                    <div
+                                                        style="width:100.8px;height:151.2px;position:absolute;top:25.2px;right:56.7px;background-size:cover;background-image:url(<?= $bgPath ?>);border-radius:4px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(180deg)">
+                                                        <div style="font-size:5px;text-align:center;line-height:1.2">
+                                                            <strong>IMPORTANT</strong><br>This card is property of the
+                                                            school.<br>If found, please return to registrar.</div>
+                                                        <div style="font-size:4.5px;margin-top:3px"><strong>Valid A.Y.
+                                                                2025-2026</strong></div>
+                                                        <img src="<?= $signPath ?>" style="height:12px;margin-top:3px">
+                                                        <div
+                                                            style="width:60px;height:12px;background:#fff;border-radius:2px;margin-top:3px">
+                                                            <!-- barcode -->
                                                         </div>
                                                     </div>
+
                                                 </div>
                                             </div>
                                         </div>
                                         <?php endif; ?>
+                                        <!-- ===== END fixed preview ===== -->
                                     </div>
                                 </div>
                             </div>
