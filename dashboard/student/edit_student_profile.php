@@ -220,27 +220,29 @@ if (isset($_GET['incomplete']) && isset($_SESSION['missing_fields'])) {
                     <div class="mb-3">
                         <label class="form-label">Current COR</label><br>
                         <?php if (!empty($student['cor'])): ?>
-                        <img src="../../uploads/student_cors/<?= htmlspecialchars($student['cor']) ?>" alt="Current COR"
+                        <img src="../../uploads/student_cor/<?= htmlspecialchars($student['cor']) ?>" alt="Current COR"
                             class="rounded mb-2" width="100" height="100" style="object-fit: cover;">
                         <?php else: ?>
                         <p class="text-danger">COR is required for ID card!</p>
                         <?php endif; ?>
                         <input type="file" name="cor" class="form-control"
-                            accept="image/jpeg,image/png,image/jpg,image/gif">
+                            accept="image/jpeg,image/png,image/jpg,image/gif,application/pdf">
+                        <small class="text-muted">Accepted formats: JPG, PNG, GIF, PDF. Max size: 2MB</small>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Student Signature</label><br>
                         <?php if (!empty($student['signature'])): ?>
-                        <img src="../../uploads/student_signatures/<?= htmlspecialchars($student['signatures']) ?>" alt="Student Signature"
-                            class="rounded mb-2" width="100" height="100" style="object-fit: cover;">
+                        <img src="../../uploads/student_signatures/<?= htmlspecialchars($student['signature']) ?>"
+                            alt="Student Signature" class="rounded mb-2" width="100" height="100"
+                            style="object-fit: cover;">
                         <?php else: ?>
                         <p class="text-danger">Signature is required for ID card!</p>
                         <?php endif; ?>
-                        <input type="file" name="cor" class="form-control"
+                        <input type="file" name="signature" class="form-control"
                             accept="image/jpeg,image/png,image/jpg,image/gif">
+                        <small class="text-muted">Accepted formats: JPG, PNG, GIF. Max size: 2MB</small>
                     </div>
-
 
 
                     <div class="d-grid gap-2">
