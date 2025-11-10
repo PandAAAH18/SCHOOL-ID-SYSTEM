@@ -252,29 +252,38 @@ $full_name = trim($student['first_name'] . ' ' . $student['last_name']);
     </div>
 
     <!-- Digital ID Card Preview -->
-    <div class="card shadow mb-4">
-      <div class="card-header bg-success text-white">My Digital ID Card</div>
-      <div class="card-body text-center">
-        <?php if (!empty($student['student_id'])): ?>
-          <div class="border p-3 rounded bg-white d-inline-block">
-            <h5><?= htmlspecialchars($full_name) ?></h5>
-            <img src="../../assets/img/sample_qr.png" alt="QR Code" width="100">
-            <p class="mt-2"><strong>ID STATUS:</strong> 
-              <?php if ($current_request && $current_request['status'] == 'completed'): ?>
-                ✅ Issued
-              <?php else: ?>
-                ⏳ Processing
-              <?php endif; ?>
-            </p>
-            <?php if ($current_request && $current_request['status'] == 'completed'): ?>
-              <a href="download_id.php" class="btn btn-success btn-sm">Download ID</a>
+    <!-- In student_dashboard.php -->
+<div class="col-md-6">
+    <div class="card info-card">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">🪪 Digital ID Card</h5>
+        </div>
+        <div class="card-body text-center">
+            <div class="mb-3">
+                <img src="generate_digital_id.php?student_id=<?= $student['id'] ?>" 
+                     alt="Digital ID Card" 
+                     class="img-fluid border rounded" 
+                     style="max-width: 300px;">
+            </div>
+            <div class="btn-group">
+                <a href="generate_digital_id.php?student_id=<?= $student['id'] ?>&download=1" 
+                   class="btn btn-primary btn-sm">
+                   📥 Download ID
+                </a>
+                <a href="generate_digital_id.php?student_id=<?= $student['id'] ?>&view=1" 
+                   target="_blank" 
+                   class="btn btn-outline-primary btn-sm">
+                   👀 View Full Size
+                </a>
+            </div>
+            <?php if ($student['digital_id_generated_at']): ?>
+                <small class="text-muted d-block mt-2">
+                    Last generated: <?= date('M j, Y g:i A', strtotime($student['digital_id_generated_at'])) ?>
+                </small>
             <?php endif; ?>
-          </div>
-        <?php else: ?>
-          <p class="text-muted">Your ID has not been generated yet.</p>
-        <?php endif; ?>
-      </div>
+        </div>
     </div>
+</div>
   </div>
 
   <script src="../../assets/js/bootstrap.bundle.min.js"></script>
