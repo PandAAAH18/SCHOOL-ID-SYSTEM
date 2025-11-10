@@ -99,193 +99,206 @@ $full_name = trim($student['first_name'] . ' ' . $student['last_name']);
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <title>Request Student ID | School ID System</title>
-  <link rel="stylesheet" href="../../assets/css/bootstrap.min.css">
-  <script>
+    <meta charset="UTF-8">
+    <title>Request Student ID | School ID System</title>
+    <link rel="stylesheet" href="../../assets/css/bootstrap.min.css">
+    <script>
     function toggleReasonField() {
-      const requestType = document.getElementById('request_type').value;
-      const reasonField = document.getElementById('reason_field');
-      
-      if (requestType === 'replacement' || requestType === 'update') {
-        reasonField.style.display = 'block';
-        document.getElementById('reason').setAttribute('required', 'required');
-      } else {
-        reasonField.style.display = 'none';
-        document.getElementById('reason').removeAttribute('required');
-      }
+        const requestType = document.getElementById('request_type').value;
+        const reasonField = document.getElementById('reason_field');
+
+        if (requestType === 'replacement' || requestType === 'update') {
+            reasonField.style.display = 'block';
+            document.getElementById('reason').setAttribute('required', 'required');
+        } else {
+            reasonField.style.display = 'none';
+            document.getElementById('reason').removeAttribute('required');
+        }
     }
-  </script>
+    </script>
 </head>
+
 <body class="bg-light">
 
-<?php include '../../includes/header_student.php'; ?>
+    <?php include '../../includes/header_student.php'; ?>
 
-  <div class="container mt-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <h2>Request Student ID</h2>
-      <a href="student_dashboard.php" class="btn btn-secondary btn-sm">Back to Dashboard</a>
-    </div>
+    <div class="container mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Request Student ID</h2>
+            <a href="student_dashboard.php" class="btn btn-secondary btn-sm">Back to Dashboard</a>
+        </div>
 
-    <!-- Success/Error Messages -->
-    <?php if ($success_message): ?>
-      <div class="alert alert-success alert-dismissible fade show" role="alert">
-        <?= $success_message ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-    <?php endif; ?>
-
-    <?php if ($error_message): ?>
-      <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <?= $error_message ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-    <?php endif; ?>
-
-    <!-- ID Request Form -->
-    <div class="card shadow mb-4">
-      <div class="card-header bg-primary text-white">
-        <h5 class="mb-0">Request ID Card</h5>
-      </div>
-      <div class="card-body">
-        <?php if (!$current_request || $current_request['status'] !== 'pending'): ?>
-          <form method="POST" action="">
-            <div class="row mb-3">
-              <div class="col-md-6">
-                <label class="form-label"><strong>Full Name</strong></label>
-                <input type="text" class="form-control" value="<?= htmlspecialchars($full_name) ?>" readonly>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label"><strong>Student ID</strong></label>
-                <input type="text" class="form-control" value="<?= htmlspecialchars($student['student_id']) ?>" readonly>
-              </div>
-            </div>
-
-            <div class="row mb-3">
-              <div class="col-md-6">
-                <label class="form-label"><strong>Email</strong></label>
-                <input type="email" class="form-control" value="<?= htmlspecialchars($student['email']) ?>" readonly>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label"><strong>Request Type</strong></label>
-                <select class="form-select" name="request_type" id="request_type" onchange="toggleReasonField()" required>
-                  <option value="">Select request type</option>
-                  <option value="new">New ID Card</option>
-                  <option value="replacement">Replacement (Lost/Damaged)</option>
-                  <option value="update">Update Information</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="mb-3" id="reason_field" style="display: none;">
-              <label class="form-label"><strong>Reason for Request</strong></label>
-              <textarea class="form-control" name="reason" id="reason" rows="3" placeholder="Please provide additional details about your request..."></textarea>
-              <div class="form-text">
-                For replacement: Please explain what happened to your previous ID<br>
-                For update: Please specify what information needs to be updated
-              </div>
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label"><strong>Current Photo</strong></label>
-              <div class="text-center">
-                <img src="<?= $student['photo'] ? '../../uploads/student_photos/' . htmlspecialchars($student['photo']) : '../../assets/img/default_user.png' ?>" 
-                     alt="Profile Photo" class="rounded-circle mb-2" width="120" height="120" style="object-fit: cover;">
-                <p class="text-muted">This photo will be used for your ID card</p>
-              </div>
-            </div>
-
-            <div class="alert alert-info">
-              <strong>Note:</strong> Your request will be reviewed by administration. You will be notified once your ID is ready for pickup.
-            </div>
-
-            <button type="submit" class="btn btn-success">Submit Request</button>
-            <a href="student.php" class="btn btn-secondary">Cancel</a>
-          </form>
-        <?php else: ?>
-          <div class="alert alert-warning">
-            <h6>You have a pending ID request</h6>
-            <p class="mb-1"><strong>Request Type:</strong> <?= ucfirst($current_request['request_type']) ?></p>
-            <p class="mb-1"><strong>Submitted:</strong> <?= date('F j, Y g:i A', strtotime($current_request['created_at'])) ?></p>
-            <p class="mb-0"><strong>Status:</strong> <span class="badge bg-warning">Pending Approval</span></p>
-          </div>
-          <p>Please wait for your current request to be processed before submitting a new one.</p>
-          <a href="student.php" class="btn btn-primary">Back to Dashboard</a>
+        <!-- Success/Error Messages -->
+        <?php if ($success_message): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <?= $success_message ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
         <?php endif; ?>
-      </div>
-    </div>
 
-    <!-- Current ID Status -->
-    <div class="card shadow mb-4">
-      <div class="card-header bg-dark text-white">Current ID Status</div>
-      <div class="card-body">
-        <?php if ($current_request): ?>
-          <div class="row">
-            <div class="col-md-6">
-              <p><strong>Request ID:</strong> #<?= $current_request['id'] ?></p>
-              <p><strong>Type:</strong> <?= ucfirst($current_request['request_type']) ?></p>
-              <p><strong>Submitted:</strong> <?= date('F j, Y g:i A', strtotime($current_request['created_at'])) ?></p>
+        <?php if ($error_message): ?>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <?= $error_message ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <?php endif; ?>
+
+        <!-- ID Request Form -->
+        <div class="card shadow mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Request ID Card</h5>
             </div>
-            <div class="col-md-6">
-              <p><strong>Status:</strong> 
-                <span class="badge 
+            <div class="card-body">
+                <?php if (!$current_request || $current_request['status'] !== 'pending'): ?>
+                <form method="POST" action="">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Full Name</strong></label>
+                            <input type="text" class="form-control" value="<?= htmlspecialchars($full_name) ?>"
+                                readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Student ID</strong></label>
+                            <input type="text" class="form-control"
+                                value="<?= htmlspecialchars($student['student_id']) ?>" readonly>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Email</strong></label>
+                            <input type="email" class="form-control" value="<?= htmlspecialchars($student['email']) ?>"
+                                readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Request Type</strong></label>
+                            <select class="form-select" name="request_type" id="request_type"
+                                onchange="toggleReasonField()" required>
+                                <option value="">Select request type</option>
+                                <option value="new">New ID Card</option>
+                                <option value="replacement">Replacement (Lost/Damaged)</option>
+                                <option value="update">Update Information</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" id="reason_field" style="display: none;">
+                        <label class="form-label"><strong>Reason for Request</strong></label>
+                        <textarea class="form-control" name="reason" id="reason" rows="3"
+                            placeholder="Please provide additional details about your request..."></textarea>
+                        <div class="form-text">
+                            For replacement: Please explain what happened to your previous ID<br>
+                            For update: Please specify what information needs to be updated
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Current Photo</strong></label>
+                        <div class="text-center">
+                            <img src="<?= $student['photo'] ? '../../uploads/student_photos/' . htmlspecialchars($student['photo']) : '../../assets/img/default_user.png' ?>"
+                                alt="Profile Photo" class="rounded-circle mb-2" width="120" height="120"
+                                style="object-fit: cover;">
+                            <p class="text-muted">This photo will be used for your ID card</p>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <strong>Note:</strong> Your request will be reviewed by administration. You will be notified
+                        once your ID is ready for pickup.
+                    </div>
+
+                    <button type="submit" class="btn btn-success">Submit Request</button>
+                    <a href="student.php" class="btn btn-secondary">Cancel</a>
+                </form>
+                <?php else: ?>
+                <div class="alert alert-warning">
+                    <h6>You have a pending ID request</h6>
+                    <p class="mb-1"><strong>Request Type:</strong> <?= ucfirst($current_request['request_type']) ?></p>
+                    <p class="mb-1"><strong>Submitted:</strong>
+                        <?= date('F j, Y g:i A', strtotime($current_request['created_at'])) ?></p>
+                    <p class="mb-0"><strong>Status:</strong> <span class="badge bg-warning">Pending Approval</span></p>
+                </div>
+                <p>Please wait for your current request to be processed before submitting a new one.</p>
+                <a href="student.php" class="btn btn-primary">Back to Dashboard</a>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Current ID Status -->
+        <div class="card shadow mb-4">
+            <div class="card-header bg-dark text-white">Current ID Status</div>
+            <div class="card-body">
+                <?php if ($current_request): ?>
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Request ID:</strong> #<?= $current_request['id'] ?></p>
+                        <p><strong>Type:</strong> <?= ucfirst($current_request['request_type']) ?></p>
+                        <p><strong>Submitted:</strong>
+                            <?= date('F j, Y g:i A', strtotime($current_request['created_at'])) ?></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Status:</strong>
+                            <span class="badge 
                   <?= $current_request['status'] == 'approved' ? 'bg-success' : '' ?>
                   <?= $current_request['status'] == 'pending' ? 'bg-warning' : '' ?>
                   <?= $current_request['status'] == 'rejected' ? 'bg-danger' : '' ?>
                   <?= $current_request['status'] == 'completed' ? 'bg-info' : '' ?>">
-                  <?= ucfirst($current_request['status']) ?>
-                </span>
-              </p>
-              <?php if ($current_request['reason']): ?>
-                <p><strong>Reason:</strong> <?= htmlspecialchars($current_request['reason']) ?></p>
-              <?php endif; ?>
-              <?php if ($current_request['admin_notes']): ?>
-                <p><strong>Admin Notes:</strong> <?= htmlspecialchars($current_request['admin_notes']) ?></p>
-              <?php endif; ?>
+                                <?= ucfirst($current_request['status']) ?>
+                            </span>
+                        </p>
+                        <?php if ($current_request['reason']): ?>
+                        <p><strong>Reason:</strong> <?= htmlspecialchars($current_request['reason']) ?></p>
+                        <?php endif; ?>
+                        <?php if ($current_request['admin_notes']): ?>
+                        <p><strong>Admin Notes:</strong> <?= htmlspecialchars($current_request['admin_notes']) ?></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php else: ?>
+                <p class="text-muted">No ID requests found. Submit a request above to get started.</p>
+                <?php endif; ?>
             </div>
-          </div>
-        <?php else: ?>
-          <p class="text-muted">No ID requests found. Submit a request above to get started.</p>
-        <?php endif; ?>
-      </div>
+        </div>
+
+        <!-- Digital ID Card Preview -->
+        <!-- ========== Digital ID Card ========== -->
+        <div class="col-md-6">
+            <div class="card info-card h-100">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Digital ID Card</h5>
+                </div>
+                <div class="card-body text-center">
+                    <?php
+      $idFile  = $student['digital_id_path'] ?? '';          // DB column
+      $idPath  = "../../uploads/digital_ids/" . $idFile;     // disk location
+      $hasID   = $idFile && file_exists($idPath);
+      ?>
+                    <div class="mb-3">
+                        <img src="<?= $hasID ? htmlspecialchars($idPath) : '../../assets/img/id_placeholder.png' ?>"
+                            alt="Digital ID Card" class="img-fluid border rounded" style="max-width:300px">
+                    </div>
+
+                    <?php if ($hasID): ?>
+                    <div class="btn-group">
+                        <a href="<?= htmlspecialchars($idPath) ?>" download class="btn btn-primary btn-sm">
+                            Download</a>
+                        <a href="<?= htmlspecialchars($idPath) ?>" target="_blank"
+                            class="btn btn-outline-primary btn-sm">View Full Size</a>
+                    </div>
+                    <small class="text-muted d-block mt-2">
+                        Last generated: <?= date('M j, Y g:i A', strtotime($student['digital_id_generated_at'])) ?>
+                    </small>
+                    <?php else: ?>
+                    <p class="text-muted mb-0">No digital ID generated yet.</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Digital ID Card Preview -->
-    <!-- In student_dashboard.php -->
-<div class="col-md-6">
-    <div class="card info-card">
-        <div class="card-header bg-dark text-white">
-            <h5 class="mb-0">🪪 Digital ID Card</h5>
-        </div>
-        <div class="card-body text-center">
-            <div class="mb-3">
-                <img src="generate_digital_id.php?student_id=<?= $student['id'] ?>" 
-                     alt="Digital ID Card" 
-                     class="img-fluid border rounded" 
-                     style="max-width: 300px;">
-            </div>
-            <div class="btn-group">
-                <a href="generate_digital_id.php?student_id=<?= $student['id'] ?>&download=1" 
-                   class="btn btn-primary btn-sm">
-                   📥 Download ID
-                </a>
-                <a href="generate_digital_id.php?student_id=<?= $student['id'] ?>&view=1" 
-                   target="_blank" 
-                   class="btn btn-outline-primary btn-sm">
-                   👀 View Full Size
-                </a>
-            </div>
-            <?php if ($student['digital_id_generated_at']): ?>
-                <small class="text-muted d-block mt-2">
-                    Last generated: <?= date('M j, Y g:i A', strtotime($student['digital_id_generated_at'])) ?>
-                </small>
-            <?php endif; ?>
-        </div>
-    </div>
-</div>
-  </div>
-
-  <script src="../../assets/js/bootstrap.bundle.min.js"></script>
+    <script src="../../assets/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>

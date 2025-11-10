@@ -260,15 +260,15 @@ $stats = array_map(fn($v) => (int)$v, $stats);
                     <div class="col-md-4">
                         <div class="d-grid">
                             <a href="bulk_approved.php" class="btn btn-success">
-                                📦 Generate IDs in Bulk
+                                Generate IDs in Bulk
                             </a>
                             <small class="text-muted mt-1">Generate multiple IDs at once</small>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="d-grid">
-                            <a href="id_templates.php" class="btn btn-info">
-                                🎨 Manage ID Templates
+                            <a href="generate_digital_bulk.php" class="btn btn-success">
+                                Generate Digital IDs in Bulk
                             </a>
                             <small class="text-muted mt-1">Customize ID card designs</small>
                         </div>
@@ -276,7 +276,7 @@ $stats = array_map(fn($v) => (int)$v, $stats);
                     <div class="col-md-4">
                         <div class="d-grid">
                             <a href="id_reports.php" class="btn btn-warning">
-                                📊 ID Issuance Reports
+                                ID Issuance Reports
                             </a>
                             <small class="text-muted mt-1">View printing statistics</small>
                         </div>
@@ -445,11 +445,10 @@ $stats = array_map(fn($v) => (int)$v, $stats);
                                             <div class="quick-actions w-100">
                                                 <a href="generate_id_card.php?student_id=<?= $request['student_pk_id'] ?>&mode=preview"
                                                     target="_blank" class="btn btn-success">👁️ View</a>
-                                                <a href="generate_id_card.php?student_id=<?= $request['student_pk_id'] ?>&mode=download"
-                                                    class="btn btn-success">
-                                                    📥 Download</a>
-                                                <a href="generate_id_card.php?student_id=<?= $request['student_pk_id'] ?>&mode=print"
-                                                    target="_blank" class="btn btn-success">🖨️ Print</a>
+                                                <a href="generate_digital_id.php?student_id=<?= $request['student_pk_id'] ?>&download=1"
+                                                    class="btn btn-success btn-sm">
+                                                    💳 Generate Digital ID
+                                                </a>
                                                 <a href="generate_id_card.php?email_id=<?= $request['student_pk_id'] ?>&template=id_template.html"
                                                     class="btn btn-success">📧 Email</a>
                                             </div>
@@ -509,7 +508,8 @@ $stats = array_map(fn($v) => (int)$v, $stats);
                                                         style="width:100.8px;height:151.2px;position:absolute;top:25.2px;right:56.7px;background-size:cover;background-image:url(<?= $bgPath ?>);border-radius:4px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(180deg)">
                                                         <div style="font-size:5px;text-align:center;line-height:1.2">
                                                             <strong>IMPORTANT</strong><br>This card is property of the
-                                                            school.<br>If found, please return to registrar.</div>
+                                                            school.<br>If found, please return to registrar.
+                                                        </div>
                                                         <div style="font-size:4.5px;margin-top:3px"><strong>Valid A.Y.
                                                                 2025-2026</strong></div>
                                                         <img src="<?= $signPath ?>" style="height:12px;margin-top:3px">

@@ -105,7 +105,7 @@ button{padding:10px 20px;font-size:16px;cursor:pointer}
       <div class="card h-100">
         <div class="card-body d-flex align-items-center gap-3">
           <input type="checkbox" class="form-check-input student-chk" value="<?= $row['student_pk_id'] ?>">
-          <img src="<?= $row['photo'] ? '../../uploads/student_photo/'.htmlspecialchars($row['photo']) : '../../assets/img/default_user.png' ?>"
+          <img src="<?= $row['photo'] ? '../../uploads/student_photos/'.htmlspecialchars($row['photo']) : '../../assets/img/default_user.png' ?>"
                class="rounded" width="60" height="60" style="object-fit:cover">
           <div>
             <strong><?= htmlspecialchars($row['last_name'].', '.$row['first_name']) ?></strong><br>

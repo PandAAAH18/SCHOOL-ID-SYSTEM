@@ -54,7 +54,7 @@ $admin_email = $_SESSION['email'] ?? '';
       <!-- Admin profile dropdown -->
       <div class="dropdown">
         <a class="d-flex align-items-center text-white text-decoration-none dropdown-toggle" href="#" role="button" id="adminProfileDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-          <img src="../../assets/img/default_admin.png" alt="Admin Profile" class="profile-img" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover; margin-right: 8px;">
+          <img src="../../assets/img/default_user.png" alt="Admin Profile" class="profile-img" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover; margin-right: 8px;">
           <span><?= htmlspecialchars($admin_name) ?></span>
         </a>
         <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="adminProfileDropdown">

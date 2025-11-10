@@ -44,7 +44,7 @@ $bg    = "../../assets/img/bg.jpg";   // 1050×672 px – same folder
 }
 
 .front{ background-image:url(<?= $bg ?>); }
-.back { background-image:url(<?= $bg ?>); transform:rotate(180deg); }
+.back { background-image:url(<?= $bg ?>);}
 
 /* ---------- shared content ---------- */
 .photo{width:120px;height:150px;object-fit:cover;border:3px solid #fff;border-radius:8px;margin:15px 0}
